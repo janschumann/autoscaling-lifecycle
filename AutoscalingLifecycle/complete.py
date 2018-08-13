@@ -1,7 +1,7 @@
 import json
 import logging
 
-from autoscaling_lifecycle.base import EventAction
+from AutoscalingLifecycle.base import EventAction
 
 
 class OnSsmEvent(EventAction):
@@ -20,8 +20,8 @@ class OnSsmEvent(EventAction):
 		'Success': 'CONTINUE',
 		'TimedOut': 'ABANDON'
 	}
-	command_data = {}
-	metadata = {}
+	command_data = { }
+	metadata = { }
 
 
 	def load_event_specific_data(self):
@@ -31,18 +31,18 @@ class OnSsmEvent(EventAction):
 			raise TypeError(self.get_name() + ': Event is not aws.ssm')
 
 		self.command_data = self.fetch_command_data(self.event_details.get('command-id'))
-		if self.command_data == {}:
+		if self.command_data == { }:
 			raise TypeError(self.get_name() + ': Data for command "' + self.event_details.get(
 				'command-id') + '" could not be found.')
 
-		self.debug('Command data: %s', json.dumps(self.command_data, ensure_ascii=False))
+		self.debug('Command data: %s', json.dumps(self.command_data, ensure_ascii = False))
 
 		self.metadata = self.command_data.get('metadata')
 		if self.metadata.get('debug', 'false') == 'true':
 			self.is_debug = True
 			self.logger.setLevel(logging.DEBUG)
 
-		self.debug('metadata: %s', json.dumps(self.metadata, ensure_ascii=False))
+		self.debug('metadata: %s', json.dumps(self.metadata, ensure_ascii = False))
 
 		self.default_result = self.status_map.get(self.event_details.get('status'))
 
@@ -58,8 +58,8 @@ class OnSsmEvent(EventAction):
 	def __call__(self):
 		self.debug('Removing command %s from db', self.event_details.get('command-id'))
 		_ = self.get_client('dynamodb').delete_item(
-			TableName=self.get_state_table(),
-			Key=self.build_dynamodb_key(self.event_details.get('command-id'))
+			TableName = self.get_state_table(),
+			Key = self.build_dynamodb_key(self.event_details.get('command-id'))
 		)
 
 		if self.is_launching():
@@ -98,8 +98,8 @@ class OnSsmEvent(EventAction):
 		self.info('Loading command data.')
 
 		item = self.get_client('dynamodb').get_item(
-			TableName=self.get_state_table(),
-			Key=self.build_dynamodb_key(command_id)
+			TableName = self.get_state_table(),
+			Key = self.build_dynamodb_key(command_id)
 		).get('Item')
 
 		return self.convert_dynamodb_map_to_dict(item)
@@ -121,11 +121,11 @@ class OnSsmEvent(EventAction):
 		self.info('Completing lifecycle action on %s: %s', self.get_node_type(), instance_id)
 
 		_ = self.get_client('autoscaling').complete_lifecycle_action(
-			LifecycleHookName=self.command_data.get('LifecycleHookName'),
-			AutoScalingGroupName=self.command_data.get('AutoScalingGroupName'),
-			LifecycleActionToken=token,
-			LifecycleActionResult=result.upper(),
-			InstanceId=instance_id
+			LifecycleHookName = self.command_data.get('LifecycleHookName'),
+			AutoScalingGroupName = self.command_data.get('AutoScalingGroupName'),
+			LifecycleActionToken = token,
+			LifecycleActionResult = result.upper(),
+			InstanceId = instance_id
 		)
 
 
@@ -137,10 +137,10 @@ class OnSsmEvent(EventAction):
 		:param instance_id: The instance to mark as ready
 		"""
 		_ = self.get_client('dynamodb').update_item(
-			TableName=self.get_state_table(),
-			Key=self.build_dynamodb_key(instance_id),
-			UpdateExpression="SET ItemStatus = :item_status",
-			ExpressionAttributeValues={
+			TableName = self.get_state_table(),
+			Key = self.build_dynamodb_key(instance_id),
+			UpdateExpression = "SET ItemStatus = :item_status",
+			ExpressionAttributeValues = {
 				':item_status': self.build_dynamodb_value('ready')
 			}
 		)
@@ -155,5 +155,5 @@ class OnSsmEvent(EventAction):
 		"""
 		self.debug('Waiting for instances become in service.')
 		self.waiters.get('InstancesInService').wait(
-			InstanceIds=instance_ids
+			InstanceIds = instance_ids
 		)

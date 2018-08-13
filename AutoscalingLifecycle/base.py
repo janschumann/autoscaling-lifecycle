@@ -4,7 +4,7 @@ import logging
 import boto3
 import botocore.client
 
-from autoscaling_lifecycle.waiters import Waiters
+from AutoscalingLifecycle.waiters import Waiters
 
 
 class EventAction(object):
@@ -22,12 +22,12 @@ class EventAction(object):
 	:type transition: str
 	"""
 	name = None
-	clients = {}
+	clients = { }
 	is_debug = False
 	logger = None
 	session = None
-	event = {}
-	event_details = {}
+	event = { }
+	event_details = { }
 	mandatory_event_keys = [
 		'id',
 		'detail-type',
@@ -118,8 +118,8 @@ class EventAction(object):
 		self.__validate_event()
 		self.event_details = self.event.get('detail')
 
-		self.debug('event data: %s', json.dumps(self.event, ensure_ascii=False))
-		self.debug('event details: %s', json.dumps(self.event_details, ensure_ascii=False))
+		self.debug('event data: %s', json.dumps(self.event, ensure_ascii = False))
+		self.debug('event details: %s', json.dumps(self.event_details, ensure_ascii = False))
 
 		self.load_event_specific_data()
 
@@ -188,7 +188,7 @@ class EventAction(object):
 		if client is None:
 			self.debug('Client %s not created. Creating ...', name)
 			client = self.session.client(name)
-			self.clients.update({name: client})
+			self.clients.update({ name: client })
 
 		return client
 
@@ -240,19 +240,19 @@ class EventAction(object):
 		self.info('Calling "%s" on "%s"', comment, instance_id)
 		self.__wait_for_ssm_agent_to_become_ready(instance_id)
 		command_id = self.get_client('ssm').send_command(
-			InstanceIds=[instance_id],
-			DocumentName='AWS-RunShellScript',
-			Comment=comment,
-			Parameters={
+			InstanceIds = [instance_id],
+			DocumentName = 'AWS-RunShellScript',
+			Comment = comment,
+			Parameters = {
 				'commands': commands
 			}
 		).get('Command').get('CommandId')
 
 		item = self.build_dynamodb_item(command_id, 'command', metadata)
-		self.info('Storing command %s with data: %s', comment, json.dumps(item, ensure_ascii=False))
+		self.info('Storing command %s with data: %s', comment, json.dumps(item, ensure_ascii = False))
 		_ = self.get_client('dynamodb').put_item(
-			TableName=self.get_state_table(),
-			Item=item
+			TableName = self.get_state_table(),
+			Item = item
 		)
 
 
@@ -273,7 +273,7 @@ class EventAction(object):
 		:return: The item
 		"""
 
-		data.update({'ItemType': type})
+		data.update({ 'ItemType': type })
 
 		item = self.convert_dict_to_dynamodb_map(data)
 		item.update(self.build_dynamodb_key(id))
@@ -288,10 +288,10 @@ class EventAction(object):
 		:return:
 		"""
 
-		return {'Ident': {'S': id}}
+		return { 'Ident': { 'S': id } }
 
 
-	def build_dynamodb_value(self, value, log=True):
+	def build_dynamodb_value(self, value, log = True):
 		"""
 
 		:param id:
@@ -299,18 +299,20 @@ class EventAction(object):
 		"""
 
 		if type(value) is str:
-			return {'S': value}
+			return { 'S': value }
 
 		elif type(value) is dict:
-			return {'M': self.convert_dict_to_dynamodb_map(value, log)}
+			return { 'M': self.convert_dict_to_dynamodb_map(value, log) }
 
 		else:
-			self.logger.warning('Cannot convert type %s to a dynamodb equivalent. Value will be empty. Valid types are str, dict. Value: %s', type(value), json.dumps(value, ensure_ascii=False))
+			self.logger.warning(
+				'Cannot convert type %s to a dynamodb equivalent. Value will be empty. Valid types are str, dict. Value: %s',
+				type(value), json.dumps(value, ensure_ascii = False))
 
-		return {'S': ''}
+		return { 'S': '' }
 
 
-	def convert_dict_to_dynamodb_map(self, data: dict, log=True) -> dict:
+	def convert_dict_to_dynamodb_map(self, data: dict, log = True) -> dict:
 		"""
 		Convert a dict to a dynamodb map. Valid types:
 		- str -> 'S'
@@ -323,19 +325,19 @@ class EventAction(object):
 		:return: The converted dynamodb map
 		"""
 		if log:
-			self.debug('Converting dict to dynamodb item: %s', json.dumps(data, ensure_ascii=False))
+			self.debug('Converting dict to dynamodb item: %s', json.dumps(data, ensure_ascii = False))
 
-		dynamodb_map = {}
+		dynamodb_map = { }
 		for key, value in data.items():
-			dynamodb_map.update({key: self.build_dynamodb_value(value, False)})
+			dynamodb_map.update({ key: self.build_dynamodb_value(value, False) })
 
 		if log:
-			self.debug('Result: %s', json.dumps(dynamodb_map, ensure_ascii=False))
+			self.debug('Result: %s', json.dumps(dynamodb_map, ensure_ascii = False))
 
 		return dynamodb_map
 
 
-	def convert_dynamodb_map_to_dict(self, map: dict, log=True) -> dict:
+	def convert_dynamodb_map_to_dict(self, map: dict, log = True) -> dict:
 		"""
 		Convert a dynamodb map to dict. Convertable types:
 		- 'S' -> str
@@ -348,20 +350,20 @@ class EventAction(object):
 		:return: The converted data
 		"""
 		if log:
-			self.debug('Converting dynamodb item to dict: %s', json.dumps(map, ensure_ascii=False))
+			self.debug('Converting dynamodb item to dict: %s', json.dumps(map, ensure_ascii = False))
 
-		data = {}
+		data = { }
 		for key, value in map.items():
 			if value.get('S', None) is not None:
-				data.update({key: value.get('S')})
+				data.update({ key: value.get('S') })
 			elif value.get('M', None) is not None:
-				data.update({key: self.convert_dynamodb_map_to_dict(value.get('M'), False)})
+				data.update({ key: self.convert_dynamodb_map_to_dict(value.get('M'), False) })
 			else:
 				self.logger.warning('Cannot convert %s. Ignoring. Valid types are M,S. Value: %s', key,
-									json.dumps(value, ensure_ascii=False))
+									json.dumps(value, ensure_ascii = False))
 
 		if log:
-			self.debug('Result: %s', json.dumps(data, ensure_ascii=False))
+			self.debug('Result: %s', json.dumps(data, ensure_ascii = False))
 
 		return data
 
@@ -412,5 +414,5 @@ class EventAction(object):
 		# can be replaced when https://github.com/boto/botocore/pull/1502 will be accepted
 		# waiter = ssm.get_waiter['AgentIsOnline']
 		self.waiters.get('AgentIsOnline').wait(
-			Filters=[{'Key': 'InstanceIds', 'Values': [instance_id]}]
+			Filters = [{ 'Key': 'InstanceIds', 'Values': [instance_id] }]
 		)

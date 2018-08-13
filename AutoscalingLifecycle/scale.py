@@ -2,7 +2,7 @@ import json
 import logging
 import time
 
-from autoscaling_lifecycle.base import EventAction
+from AutoscalingLifecycle.base import EventAction
 
 
 class OnAutoscalingEvent(EventAction):
@@ -11,7 +11,7 @@ class OnAutoscalingEvent(EventAction):
 
 	:type metadata: dict
 	"""
-	metadata = {}
+	metadata = { }
 
 
 	def load_event_specific_data(self):
@@ -25,7 +25,7 @@ class OnAutoscalingEvent(EventAction):
 			self.is_debug = True
 			self.logger.setLevel(logging.DEBUG)
 
-		self.debug('metadata: %s', json.dumps(self.metadata, ensure_ascii=False))
+		self.debug('metadata: %s', json.dumps(self.metadata, ensure_ascii = False))
 
 		self.transition = self.event_details.get('LifecycleTransition')
 		if self.transition != 'autoscaling:EC2_INSTANCE_LAUNCHING' and self.transition != 'autoscaling:EC2_INSTANCE_TERMINATING':
@@ -79,9 +79,9 @@ class OnAutoscalingEvent(EventAction):
 		:rtype: dict
 		:return: A dictionary containing the data to store while registering a node
 		"""
-		data = {}
-		data.update({'EC2InstanceId': self.event_details.get('EC2InstanceId')})
-		data.update({'ItemStatus': 'pending'})
+		data = { }
+		data.update({ 'EC2InstanceId': self.event_details.get('EC2InstanceId') })
+		data.update({ 'ItemStatus': 'pending' })
 
 		return data
 
@@ -90,8 +90,8 @@ class OnAutoscalingEvent(EventAction):
 		self.info('Register %s node to db %s', self.get_node_type(), self.event_details.get('EC2InstanceId'))
 
 		_ = self.get_client('dynamodb').put_item(
-			TableName=self.get_state_table(),
-			Item=self.build_dynamodb_item(
+			TableName = self.get_state_table(),
+			Item = self.build_dynamodb_item(
 				self.event_details.get('EC2InstanceId'),
 				self.get_node_type(),
 				self._get_registration_data()
@@ -102,6 +102,6 @@ class OnAutoscalingEvent(EventAction):
 	def __remove_node(self):
 		instance_id = self.event_details.get('EC2InstanceId')
 		_ = self.get_client('dynamodb').delete_item(
-			TableName=self.get_state_table(),
-			Key=self.build_dynamodb_key(instance_id)
+			TableName = self.get_state_table(),
+			Key = self.build_dynamodb_key(instance_id)
 		)
