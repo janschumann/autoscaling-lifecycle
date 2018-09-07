@@ -79,7 +79,7 @@ class LifecycleLogger(object):
 		args = list(args)
 		for arg in args:
 			if type(arg) is not str:
-				arg = json.dumps(arg, ensure_ascii=False)
+				arg = json.dumps(arg, ensure_ascii = False)
 
 			the_args.append(arg)
 

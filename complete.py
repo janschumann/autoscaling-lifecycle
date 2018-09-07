@@ -1,6 +1,6 @@
 from lib.base import EventAction
-from copy import copy
 from lib.entity.node import Node
+
 
 class OnSsmEvent(EventAction):
 	"""
@@ -17,7 +17,7 @@ class OnSsmEvent(EventAction):
 		'Success': 'CONTINUE',
 		'TimedOut': 'ABANDON'
 	}
-	command_data = {}
+	command_data = { }
 
 
 	def _populate_event_data(self, event: dict):
@@ -84,7 +84,8 @@ class OnSsmEvent(EventAction):
 					else:
 						raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
 				except Exception as e:
-					self.logger.error('Something went wrong; %s. Now trying to at least complete the lifecycle action...', repr(e))
+					self.logger.error(
+						'Something went wrong; %s. Now trying to at least complete the lifecycle action...', repr(e))
 					self.__gracefull_complete()
 
 			self.command_repository.delete(self.event_details.get('command-id'))
@@ -96,10 +97,12 @@ class OnSsmEvent(EventAction):
 				self.node = Node(self.command_data.get('EC2InstanceId'), 'unknown')
 
 			self.node.set_status('terminating')
-			if self.node.get_property('LifecycleActionToken') is None and self.command_data.get('LifecycleActionToken', None) is not None:
+			if self.node.get_property('LifecycleActionToken') is None and self.command_data.get('LifecycleActionToken',
+																								None) is not None:
 				self.node.set_property('LifecycleActionToken', self.command_data.get('LifecycleActionToken'))
 
-			self.complete_lifecycle_action(self.node.get_id(), self.node.get_property('LifecycleActionToken'), 'ABANDON')
+			self.complete_lifecycle_action(self.node.get_id(), self.node.get_property('LifecycleActionToken'),
+										   'ABANDON')
 			self.node_repository.delete(self.node)
 		except Exception as e:
 			self.logger.error('Failed to gracefully complete the action: %s', repr(e))

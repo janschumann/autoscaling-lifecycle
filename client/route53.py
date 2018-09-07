@@ -29,7 +29,7 @@ class Route53Client(object):
 	def apply_dns_change_set(self, zone_id):
 		self.logger.debug("Updating DNS records in zone %s: %s", zone_id, self.dns_change_set)
 		_ = self.client.change_resource_record_sets(
-			HostedZoneId=zone_id,
-			ChangeBatch={'Changes': self.dns_change_set}
+			HostedZoneId = zone_id,
+			ChangeBatch = { 'Changes': self.dns_change_set }
 		)
 		self.reset_dns_change_set()

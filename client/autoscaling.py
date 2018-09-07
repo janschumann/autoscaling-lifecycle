@@ -52,11 +52,11 @@ class AutoscalingClient(object):
 	def complete_lifecycle_action(self, hook_name, group_name, token, result, instance_id):
 		self.logger.debug('Copleting lifecycle action for %s with %s', instance_id, result)
 		_ = self.client.complete_lifecycle_action(
-			LifecycleHookName=hook_name,
-			AutoScalingGroupName=group_name,
-			LifecycleActionToken=token,
-			LifecycleActionResult=result,
-			InstanceId=instance_id
+			LifecycleHookName = hook_name,
+			AutoScalingGroupName = group_name,
+			LifecycleActionToken = token,
+			LifecycleActionResult = result,
+			InstanceId = instance_id
 		)
 
 
@@ -69,7 +69,7 @@ class AutoscalingClient(object):
 		"""
 		self.logger.debug('Autoscaling: Waiting for instances become in service.')
 		self.waiters.get('InstancesInService').wait(
-			InstanceIds=instance_ids
+			InstanceIds = instance_ids
 		)
 
 
@@ -78,7 +78,7 @@ class AutoscalingClient(object):
 		self.wait_for_instances_in_service(instance_ids)
 
 		_ = self.client.set_instance_protection(
-			InstanceIds=instance_ids,
-			AutoScalingGroupName=group_name,
-			ProtectedFromScaleIn=True
+			InstanceIds = instance_ids,
+			AutoScalingGroupName = group_name,
+			ProtectedFromScaleIn = True
 		)

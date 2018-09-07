@@ -16,5 +16,6 @@ class CommandRepository(object):
 	def get(self, id: str):
 		return self.client.get_item(id)
 
+
 	def delete(self, id: str):
 		self.client.delete_item(id)

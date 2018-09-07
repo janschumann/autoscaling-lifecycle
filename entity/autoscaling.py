@@ -8,7 +8,7 @@ class AutoscalingEvent(Event):
 	def __init__(self, event):
 		super().__init__(event)
 
-		self.__metadata = json.loads(self.detail.get('NotificationMetadata')) or {}
+		self.__metadata = json.loads(self.detail.get('NotificationMetadata')) or { }
 
 
 	@property

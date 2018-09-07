@@ -89,7 +89,7 @@ class Waiters(object):
 			}
 		}
 	}
-	waiters = {}
+	waiters = { }
 
 
 	def __init__(self, clients: ClientFactory, logger: LifecycleLogger):
@@ -171,4 +171,4 @@ class Waiters(object):
 		if name not in model.waiter_names:
 			raise self.logger.get_error(KeyError, 'Waiter %s does not exist', name)
 
-		self.waiters.update({name: botocore.waiter.create_waiter_with_client(name, model, client)})
+		self.waiters.update({ name: botocore.waiter.create_waiter_with_client(name, model, client) })

@@ -21,7 +21,7 @@ class ClientFactory(object):
 		"""
 		self.session = session
 		self.logger = logger
-		self.clients = {}
+		self.clients = { }
 
 
 	def get(self, name: str):
@@ -42,6 +42,6 @@ class ClientFactory(object):
 		if client is None:
 			self.logger.debug('Client %s not created. Creating ...', name)
 			client = self.session.client(name)
-			self.clients.update({name: client})
+			self.clients.update({ name: client })
 
 		return client

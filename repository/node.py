@@ -22,10 +22,13 @@ class NodeRepository(object):
 
 	def get(self, id: str):
 		item = self.client.get_item(id)
-		node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
-		node.set_status(item.pop('ItemStatus'))
-		for k,v in item.items():
-			node.set_property(k,v)
+		if len(item.keys() > 0):
+			node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
+			node.set_status(item.pop('ItemStatus'))
+			for k, v in item.items():
+				node.set_property(k, v)
+		else:
+			node = Node('', '')
 
 		return node
 
@@ -36,13 +39,14 @@ class NodeRepository(object):
 
 		self.client.unset(node.get_id(), properties)
 
+
 	def update(self, node: Node, changes: dict):
 		parts = []
-		values = {}
-		for k,v in changes.items():
-			node.set_property(k,v)
+		values = { }
+		for k, v in changes.items():
+			node.set_property(k, v)
 			parts.append(' ' + k + ' = :' + k)
-			values.update({':' + k: node.get_property(k)})
+			values.update({ ':' + k: node.get_property(k) })
 
 		expression = 'SET' + ','.join(parts)
 
@@ -53,7 +57,8 @@ class NodeRepository(object):
 		self.client.delete_item(node.get_id())
 
 
-	def get_by_type(self, types: list, additional_filter: str = None, attribute_values: dict = None, include_terminating: bool = False):
+	def get_by_type(self, types: list, additional_filter: str = None, attribute_values: dict = None,
+					include_terminating: bool = False):
 		"""
 		Fetch nodes by type and add custom filters.
 
@@ -76,15 +81,15 @@ class NodeRepository(object):
 		elif additional_filter is not None and attribute_values is not None:
 			filter = filter + ' and (' + additional_filter + ')'
 		elif attribute_values is None:
-			attribute_values = {}
+			attribute_values = { }
 
 		if not include_terminating:
-			attribute_values.update({':terminating': 'terminating'})
-			attribute_values.update({':removing': 'removing'})
+			attribute_values.update({ ':terminating': 'terminating' })
+			attribute_values.update({ ':removing': 'removing' })
 
 		parts = []
 		for index, node_type in enumerate(types):
-			attribute_values.update({':node_type' + str(index): node_type})
+			attribute_values.update({ ':node_type' + str(index): node_type })
 			parts.append('ItemType = :node_type' + str(index))
 		expression = '(' + ' or '.join(parts) + ') ' + filter
 
@@ -94,8 +99,8 @@ class NodeRepository(object):
 		for item in items:
 			node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
 			node.set_status(item.pop('ItemStatus'))
-			for k,v in item.items():
-				node.set_property(k,v)
+			for k, v in item.items():
+				node.set_property(k, v)
 			nodes.append(node)
 
 		return nodes

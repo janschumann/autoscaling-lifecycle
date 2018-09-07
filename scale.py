@@ -19,7 +19,8 @@ class OnAutoscalingEvent(EventAction):
 
 		super()._populate_event_data(event)
 
-		self.event_details.update({'NotificationMetadata': json.loads(self.event_details.get('NotificationMetadata'))})
+		self.event_details.update(
+			{ 'NotificationMetadata': json.loads(self.event_details.get('NotificationMetadata')) })
 		if self.event_details.get('NotificationMetadata').get('debug', 'false') == 'true':
 			self.logger.set_debug()
 
@@ -58,8 +59,14 @@ class OnAutoscalingEvent(EventAction):
 		elif self.autoscaling_client.is_terminating():
 			self.logger.set_name(self.logger.get_name() + '::IN:: ')
 
-			self.logger.info('Get node %s from the db.', self.event_details.get('EC2InstanceId'))
-			self.node = self.node_repository.get(self.event_details.get('EC2InstanceId'))
+			self.logger.info('Loading node %s from the db.', self.event_details.get('EC2InstanceId'))
+			try:
+				self.node = self.node_repository.get(self.event_details.get('EC2InstanceId'))
+			except TypeError as e:
+				self.logger.error('Could not load node. Trying to complete the lifecycle action.')
+				self.__gracefull_complete()
+				return True
+
 			self.logger.info('Setting node status to "terminating"')
 			self.node_repository.update(self.node, {
 				'ItemStatus': 'terminating',
@@ -92,7 +99,7 @@ class OnAutoscalingEvent(EventAction):
 		:rtype: dict
 		:return: A dict of specific data
 		"""
-		return {}
+		return { }
 
 
 	def _on_launch(self):
@@ -107,3 +114,16 @@ class OnAutoscalingEvent(EventAction):
 		What to do on termination. Needs to be implemented by specific actions
 		"""
 		raise NotImplementedError()
+
+
+	def __gracefull_complete(self):
+		try:
+			self.autoscaling_client.complete_lifecycle_action(
+				self.event_details.get('LifecycleHookName'),
+				self.event_details.get('AutoScalingGroupName'),
+				self.event_details.get('LifecycleActionToken'),
+				'ABANDON',
+				self.command_data.get('EC2InstanceId')
+			)
+		except Exception as e:
+			self.logger.error('Failed to gracefully complete the lifecycle: %s', repr(e))

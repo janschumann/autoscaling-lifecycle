@@ -1,7 +1,6 @@
 from logging import Logger
 
 from boto3 import Session
-
 from lib.client.autoscaling import AutoscalingClient
 from lib.client.dynamodb import DynamoDbClient
 from lib.client.factory import ClientFactory
@@ -34,8 +33,8 @@ class EventAction(object):
 	"""
 	logger = None
 	session = None
-	event = {}
-	event_details = {}
+	event = { }
+	event_details = { }
 	mandatory_event_keys = [
 		'id',
 		'detail-type',
@@ -115,7 +114,7 @@ class EventAction(object):
 		:param logger: A logger instance
 		"""
 
-		self.logger = LifecycleLogger(name=name.upper(), logger=logger)
+		self.logger = LifecycleLogger(name = name.upper(), logger = logger)
 		self.__create_clients(name, session)
 		self._populate_event_data(event)
 
@@ -171,28 +170,29 @@ class EventAction(object):
 		:param metadata: A dictionary of metadata to store alongside with the command
 		"""
 
-		metadata.update({'RunningOn': instance_id})
-		metadata.update({'Comment': comment})
-		metadata.update({'Commands': ','.join(commands)})
+		metadata.update({ 'RunningOn': instance_id })
+		metadata.update({ 'Comment': comment })
+		metadata.update({ 'Commands': ','.join(commands) })
 
 		try:
 			command_id = self.ssm_client.send_command(instance_id, comment, commands)
 			self.command_repository.register(command_id, metadata)
 		except Exception as e:
 			self.ssm_client.send_command(instance_id, 'ABANDON NODE due to an error. See logs for details.', ['exit 1'])
-			raise self.logger.get_error(RuntimeError, 'Could not send command %s. Node will be abandoned. Error was: %s',
+			raise self.logger.get_error(RuntimeError,
+										'Could not send command %s. Node will be abandoned. Error was: %s',
 										comment, repr(e))
 
 
 	def __create_clients(self, name: str, session: Session):
 		self.logger.debug('Creating clients ...')
-		client_factory = ClientFactory(session=session, logger=self.logger)
-		waiters = Waiters(clients=client_factory, logger=self.logger)
+		client_factory = ClientFactory(session = session, logger = self.logger)
+		waiters = Waiters(clients = client_factory, logger = self.logger)
 		self.dynamodb_client = DynamoDbClient(
-			client=client_factory.get('dynamodb'),
-			state_table=name.lower() + '-state',
-			logger=self.logger,
-			waiters=waiters
+			client = client_factory.get('dynamodb'),
+			state_table = name.lower() + '-state',
+			logger = self.logger,
+			waiters = waiters
 		)
 		self.node_repository = NodeRepository(self.dynamodb_client, self.logger)
 		self.command_repository = CommandRepository(self.dynamodb_client, self.logger)

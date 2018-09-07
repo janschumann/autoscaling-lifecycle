@@ -2,7 +2,7 @@ class Node(object):
 	id = None
 	type = None
 	status = 'pending'
-	data = {}
+	data = { }
 	mandatory_propertoes = [
 		'EC2InstanceId',
 		'ItemType',
@@ -15,12 +15,12 @@ class Node(object):
 
 
 	def __init__(self, id, node_type):
-		self.data = {}
+		self.data = { }
 		self.id = id
-		self.data.update({'EC2InstanceId': self.id})
+		self.data.update({ 'EC2InstanceId': self.id })
 		self.type = node_type
-		self.data.update({'ItemType': self.type})
-		self.data.update({'ItemStatus': self.status})
+		self.data.update({ 'ItemType': self.type })
+		self.data.update({ 'ItemStatus': self.status })
 
 
 	def get_id(self):
@@ -37,10 +37,10 @@ class Node(object):
 
 	def set_status(self, status):
 		self.status = status
-		self.data.update({'ItemStatus': self.status})
+		self.data.update({ 'ItemStatus': self.status })
 
 
-	def get_property(self, property, default=None):
+	def get_property(self, property, default = None):
 		return self.data.get(property, default)
 
 
@@ -51,7 +51,7 @@ class Node(object):
 		if property == 'ItemStatus':
 			self.set_status(value)
 		else:
-			self.data.update({property: value})
+			self.data.update({ property: value })
 
 
 	def unset_property(self, property):
@@ -59,6 +59,10 @@ class Node(object):
 			raise TypeError(property + ' cannot be unset.')
 
 		_ = self.data.pop(property)
+
+
+	def is_valid(self):
+		return self.id != ''
 
 
 	def to_dict(self):
