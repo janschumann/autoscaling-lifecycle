@@ -64,7 +64,7 @@ class OnSsmEvent(EventAction):
 			try:
 				self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
 			except TypeError as e:
-				self.logger.error('Could not load node. Trying to complete the lifecycle action. Removing command.')
+				self.logger.error('Could not load node: %s. Trying to complete the lifecycle action. Removing command.', repr(e))
 				self.__gracefull_complete()
 
 			if type(self.node) is Node:

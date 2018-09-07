@@ -22,13 +22,10 @@ class NodeRepository(object):
 
 	def get(self, id: str):
 		item = self.client.get_item(id)
-		if len(item.keys() > 0):
-			node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
-			node.set_status(item.pop('ItemStatus'))
-			for k, v in item.items():
-				node.set_property(k, v)
-		else:
-			node = Node('', '')
+		node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
+		node.set_status(item.pop('ItemStatus'))
+		for k, v in item.items():
+			node.set_property(k, v)
 
 		return node
 
