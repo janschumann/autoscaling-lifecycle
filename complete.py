@@ -88,7 +88,7 @@ class OnSsmEvent(EventAction):
 						'Something went wrong; %s. Now trying to at least complete the lifecycle action...', repr(e))
 					self.__gracefull_complete()
 
-			self.command_repository.delete(self.event_details.get('command-id'))
+		self.command_repository.delete(self.event_details.get('command-id'))
 
 
 	def __gracefull_complete(self):
