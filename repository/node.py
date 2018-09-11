@@ -1,4 +1,5 @@
 from lib.client.dynamodb import DynamoDbClient
+
 from lib.entity.node import Node
 from lib.helper.logger import LifecycleLogger
 
