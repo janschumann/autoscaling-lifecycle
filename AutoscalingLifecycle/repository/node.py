@@ -1,7 +1,7 @@
-from lib.client.dynamodb import DynamoDbClient
+from AutoscalingLifecycle.client.dynamodb import DynamoDbClient
 
-from lib.entity.node import Node
-from lib.helper.logger import LifecycleLogger
+from AutoscalingLifecycle.entity.node import Node
+from AutoscalingLifecycle.helper.logger import LifecycleLogger
 
 
 class NodeRepository(object):

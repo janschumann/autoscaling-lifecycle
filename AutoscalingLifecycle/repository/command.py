@@ -1,5 +1,5 @@
-from lib.client.dynamodb import DynamoDbClient
-from lib.helper.logger import LifecycleLogger
+from AutoscalingLifecycle.client.dynamodb import DynamoDbClient
+from AutoscalingLifecycle.helper.logger import LifecycleLogger
 
 
 class CommandRepository(object):

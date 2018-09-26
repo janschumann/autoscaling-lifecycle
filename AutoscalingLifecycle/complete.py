@@ -1,5 +1,5 @@
-from lib.base import EventAction
-from lib.entity.node import Node
+from AutoscalingLifecycle.base import EventAction
+from AutoscalingLifecycle.entity.node import Node
 
 
 class OnSsmEvent(EventAction):
@@ -64,7 +64,8 @@ class OnSsmEvent(EventAction):
 			try:
 				self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
 			except TypeError as e:
-				self.logger.error('Could not load node: %s. Trying to complete the lifecycle action. Removing command.', repr(e))
+				self.logger.error('Could not load node: %s. Trying to complete the lifecycle action. Removing command.',
+								  repr(e))
 				self.__gracefull_complete()
 
 			if type(self.node) is Node:

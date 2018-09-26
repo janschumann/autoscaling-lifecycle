@@ -1,5 +1,5 @@
-from lib.helper.logger import LifecycleLogger
-from lib.helper.waiters import Waiters
+from AutoscalingLifecycle.helper.logger import LifecycleLogger
+from AutoscalingLifecycle.helper.waiters import Waiters
 
 
 class AutoscalingClient(object):

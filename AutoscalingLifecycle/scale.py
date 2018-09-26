@@ -1,7 +1,7 @@
 import json
 import time
 
-from lib.base import EventAction
+from AutoscalingLifecycle.base import EventAction
 
 
 class OnAutoscalingEvent(EventAction):

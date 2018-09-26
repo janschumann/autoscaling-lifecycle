@@ -1,15 +1,16 @@
 from logging import Logger
 
 from boto3 import Session
-from lib.client.autoscaling import AutoscalingClient
-from lib.client.dynamodb import DynamoDbClient
-from lib.client.factory import ClientFactory
-from lib.client.route53 import Route53Client
-from lib.client.ssm import SsmClient
-from lib.helper.logger import LifecycleLogger
-from lib.helper.waiters import Waiters
-from lib.repository.command import CommandRepository
-from lib.repository.node import NodeRepository
+
+from AutoscalingLifecycle.client.autoscaling import AutoscalingClient
+from AutoscalingLifecycle.client.dynamodb import DynamoDbClient
+from AutoscalingLifecycle.client.factory import ClientFactory
+from AutoscalingLifecycle.client.route53 import Route53Client
+from AutoscalingLifecycle.client.ssm import SsmClient
+from AutoscalingLifecycle.helper.logger import LifecycleLogger
+from AutoscalingLifecycle.helper.waiters import Waiters
+from AutoscalingLifecycle.repository.command import CommandRepository
+from AutoscalingLifecycle.repository.node import NodeRepository
 
 
 class EventAction(object):

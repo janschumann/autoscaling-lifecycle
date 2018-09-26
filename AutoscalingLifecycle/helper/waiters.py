@@ -1,8 +1,8 @@
 import botocore.client
 import botocore.waiter
 
-from lib.client.factory import ClientFactory
-from lib.helper.logger import LifecycleLogger
+from AutoscalingLifecycle.client.factory import ClientFactory
+from AutoscalingLifecycle.helper.logger import LifecycleLogger
 
 
 class Waiters(object):

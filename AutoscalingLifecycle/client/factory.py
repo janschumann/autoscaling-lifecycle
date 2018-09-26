@@ -1,7 +1,7 @@
 from boto3 import Session
 from botocore.client import BaseClient
 
-from lib.helper.logger import LifecycleLogger
+from AutoscalingLifecycle.helper.logger import LifecycleLogger
 
 
 class ClientFactory(object):

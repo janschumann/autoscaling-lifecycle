@@ -1,4 +1,4 @@
-from lib.entity.event import Event
+from AutoscalingLifecycle.entity.event import Event
 
 
 class SsmEvent(Event):
