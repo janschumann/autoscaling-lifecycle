@@ -50,6 +50,8 @@ class OnAutoscalingEvent(EventAction):
 			)
 			self.logger.debug('Registered node data: %s', self.node.to_dict())
 
+			self.report_activity('is launching', self.event_details.get('AutoScalingGroupName'), self.event_details.get('EC2InstanceId'))
+
 			self.logger.debug('Waiting for cloud-init to finish ...')
 			time.sleep(60)
 
@@ -58,6 +60,8 @@ class OnAutoscalingEvent(EventAction):
 
 		elif self.autoscaling_client.is_terminating():
 			self.logger.set_name(self.logger.get_name() + '::IN:: ')
+
+			self.report_activity('is terminating', self.event_details.get('AutoScalingGroupName'), self.event_details.get('EC2InstanceId'))
 
 			self.logger.info('Loading node %s from the db.', self.event_details.get('EC2InstanceId'))
 			try:
@@ -123,7 +127,7 @@ class OnAutoscalingEvent(EventAction):
 				self.event_details.get('AutoScalingGroupName'),
 				self.event_details.get('LifecycleActionToken'),
 				'ABANDON',
-				self.command_data.get('EC2InstanceId')
+				self.event_details.get('EC2InstanceId')
 			)
 		except Exception as e:
 			self.logger.error('Failed to gracefully complete the lifecycle: %s', repr(e))

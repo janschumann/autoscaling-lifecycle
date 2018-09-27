@@ -7,6 +7,7 @@ from AutoscalingLifecycle.client.dynamodb import DynamoDbClient
 from AutoscalingLifecycle.client.factory import ClientFactory
 from AutoscalingLifecycle.client.route53 import Route53Client
 from AutoscalingLifecycle.client.ssm import SsmClient
+from AutoscalingLifecycle.client.sns import SnsClient
 from AutoscalingLifecycle.helper.logger import LifecycleLogger
 from AutoscalingLifecycle.helper.waiters import Waiters
 from AutoscalingLifecycle.repository.command import CommandRepository
@@ -48,7 +49,7 @@ class EventAction(object):
 	]
 
 
-	def __init__(self, name: str, event: dict, session: Session, logger: Logger):
+	def __init__(self, name: str, event: dict, session: Session, logger: Logger, notification_arn):
 		"""
 		Create a new action
 
@@ -116,7 +117,7 @@ class EventAction(object):
 		"""
 
 		self.logger = LifecycleLogger(name = name.upper(), logger = logger)
-		self.__create_clients(name, session)
+		self.__create_clients(name, session, notification_arn)
 		self._populate_event_data(event)
 
 
@@ -185,7 +186,7 @@ class EventAction(object):
 										comment, repr(e))
 
 
-	def __create_clients(self, name: str, session: Session):
+	def __create_clients(self, name: str, session: Session, notification_arn):
 		self.logger.debug('Creating clients ...')
 		client_factory = ClientFactory(session = session, logger = self.logger)
 		waiters = Waiters(clients = client_factory, logger = self.logger)
@@ -200,3 +201,9 @@ class EventAction(object):
 		self.ssm_client = SsmClient(client_factory.get('ssm'), waiters, self.logger)
 		self.autoscaling_client = AutoscalingClient(client_factory.get('autoscaling'), waiters, self.logger)
 		self.route53_client = Route53Client(client_factory.get('route53'), waiters, self.logger)
+		self.sns = SnsClient(client_factory.get('sns'), waiters, self.logger, notification_arn)
+
+
+	def report_activity(self, action, group, instance_id):
+		activity = self.autoscaling_client.get_autoscaling_activity(group, instance_id)
+		self.sns.publish(self.logger.get_formatted_message("A new node %s: %s", [action, activity]))

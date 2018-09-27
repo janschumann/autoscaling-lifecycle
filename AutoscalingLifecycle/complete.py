@@ -76,11 +76,13 @@ class OnSsmEvent(EventAction):
 						self.logger.set_name(self.logger.get_name() + '::Launch:: ')
 						self.logger.info('Completing lifecycle action on launch')
 						self._on_launch()
+						self.report_activity('has launched', self.command_data.get('AutoScalingGroupName'), self.command_data.get('EC2InstanceId'))
 
 					elif self.autoscaling_client.is_terminating():
 						self.logger.set_name(self.logger.get_name() + '::Terminate:: ')
 						self.logger.info('Completing lifecycle action on termination')
 						self._on_terminate()
+						self.report_activity('has terminated', self.command_data.get('AutoScalingGroupName'), self.command_data.get('EC2InstanceId'))
 
 					else:
 						raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')

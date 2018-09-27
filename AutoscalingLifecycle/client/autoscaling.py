@@ -82,3 +82,15 @@ class AutoscalingClient(object):
 			AutoScalingGroupName = group_name,
 			ProtectedFromScaleIn = True
 		)
+
+
+	def get_autoscaling_activity(self, group, instance_id):
+		activities = self.client.describe_scaling_activities(
+			AutoScalingGroupName = group
+		)['Activities']
+
+		for activity in activities:
+			if activity.get('Description').find(instance_id):
+				return activity
+
+		return {}
