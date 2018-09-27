@@ -80,7 +80,7 @@ class LifecycleLogger(object):
 		args = list(args)
 		for arg in args:
 			if type(arg) is not str:
-				arg = json.dumps(arg, ensure_ascii = False, default = self.__json_convert)
+				arg = json.dumps(arg, sort_keys=True, indent=2, ensure_ascii = False, default = self.__json_convert)
 
 			the_args.append(arg)
 
