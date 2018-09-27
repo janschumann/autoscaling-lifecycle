@@ -206,4 +206,5 @@ class EventAction(object):
 
 	def report_activity(self, action, group, instance_id):
 		activity = self.autoscaling_client.get_autoscaling_activity(group, instance_id)
+		self.logger.info('Reporting activity: node %s: %s', action, activity)
 		self.sns.publish(self.logger.get_formatted_message("A new node %s: %s", [action, activity]))
