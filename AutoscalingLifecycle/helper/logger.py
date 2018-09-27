@@ -1,6 +1,7 @@
 import json
 from logging import DEBUG
 from logging import Logger
+import datetime
 
 
 class LifecycleLogger(object):
@@ -79,8 +80,13 @@ class LifecycleLogger(object):
 		args = list(args)
 		for arg in args:
 			if type(arg) is not str:
-				arg = json.dumps(arg, ensure_ascii = False)
+				arg = json.dumps(arg, ensure_ascii = False, default = self.__json_convert)
 
 			the_args.append(arg)
 
 		return ('%s: ' + message) % tuple(the_args)
+
+
+	def __json_convert(self, o):
+		if isinstance(o, datetime.datetime):
+			return o.__str__()
