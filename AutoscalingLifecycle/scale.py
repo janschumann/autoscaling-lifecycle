@@ -33,6 +33,8 @@ class OnAutoscalingEvent(EventAction):
 		self.logger.info('Executing %s ...', self.get_action_info())
 
 		if self.autoscaling_client.is_launching():
+			self.report_activity('is launching', self.event_details.get('AutoScalingGroupName'), self.event_details.get('EC2InstanceId'))
+
 			self.logger.set_name(self.logger.get_name() + '::OUT:: ')
 
 			self.logger.info('Determine node type ...')
@@ -49,8 +51,6 @@ class OnAutoscalingEvent(EventAction):
 				data
 			)
 			self.logger.debug('Registered node data: %s', self.node.to_dict())
-
-			self.report_activity('is launching', self.event_details.get('AutoScalingGroupName'), self.event_details.get('EC2InstanceId'))
 
 			self.logger.debug('Waiting for cloud-init to finish ...')
 			time.sleep(60)
@@ -81,10 +81,9 @@ class OnAutoscalingEvent(EventAction):
 
 			# delegate to specific event
 			self._on_terminate()
-
+			
 		else:
 			raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
-
 
 	def _determine_node_type(self) -> str:
 		"""

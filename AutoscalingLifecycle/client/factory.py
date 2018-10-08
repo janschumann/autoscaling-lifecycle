@@ -24,7 +24,7 @@ class ClientFactory(object):
 		self.clients = { }
 
 
-	def get(self, name: str):
+	def get(self, name: str, region_name: str = 'eu-central-1'):
 		"""
 		Get a boto client. Clients will be cached locally.
 		E.g. get_client('ssm') will return boto3.client('ssm')
