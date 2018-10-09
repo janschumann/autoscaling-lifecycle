@@ -32,16 +32,19 @@ class ClientFactory(object):
 		:type name: str
 		:param name: The name of the client to create
 
+		:type region_name: str
+		:param region_name: The region this client will be created in
+
 		:rtype: BaseClient
 		:return: Service client instance
 		"""
 
-		self.logger.info('Retrieving client %s', name)
-
+		self.logger.info('Retrieving client %s in region %s', name, region_name)
+		name = name + '_' + region_name
 		client = self.clients.get(name, None)
 		if client is None:
 			self.logger.debug('Client %s not created. Creating ...', name)
-			client = self.session.client(name)
+			client = self.session.client(name, region_name = region_name)
 			self.clients.update({ name: client })
 
 		return client

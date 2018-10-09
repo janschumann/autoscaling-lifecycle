@@ -202,10 +202,18 @@ class EventAction(object):
 		self.ssm_client = SsmClient(client_factory.get('ssm'), waiters, self.logger)
 		self.autoscaling_client = AutoscalingClient(client_factory.get('autoscaling'), waiters, self.logger)
 		self.route53_client = Route53Client(client_factory.get('route53'), waiters, self.logger)
-		self.sns = SnsClient(client_factory.get('sns', 'eu-west-1'), waiters, self.logger, notification_arn, account, env)
+		self.sns = SnsClient(
+			client_factory.get('sns'),
+			client_factory.get('sns', 'eu-west-1'),
+			waiters,
+			self.logger,
+			notification_arn,
+			account,
+			env
+		)
 
 
 	def report_activity(self, action, group, instance_id):
 		activity = self.autoscaling_client.get_autoscaling_activity(group, instance_id)
 		self.logger.info('Reporting activity: node %s: %s', action, activity)
-		self.sns.publish(action, activity)
+		self.sns.publish(action, activity, 'eu-west-1')
