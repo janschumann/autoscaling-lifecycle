@@ -1,4 +1,6 @@
+import datetime
 import json
+
 
 class SnsClient(object):
 
@@ -14,21 +16,26 @@ class SnsClient(object):
 
 	def publish(self, action, activity, region = "eu-central-1"):
 		if self.topic_arn != "":
-			result = json.dumps(activity, indent=4, sort_keys=True, ensure_ascii=False)
+			result = json.dumps(activity, indent = 4, sort_keys = True, ensure_ascii = False,
+								default = self.__json_convert)
 			subject = self.logger.get_formatted_message("A node %s in %s", [action, self.env])
 			message = json.dumps({
 				'default': result,
 				'sms': subject,
 				'email': subject + ":\n\n" + result
-			}, indent=4, sort_keys=True, ensure_ascii=False)
+			}, indent = 4, sort_keys = True, ensure_ascii = False)
 			if region == "eu-west-1":
 				client = self.client_eu_west
 			else:
 				client = self.client_eu_central
 			client.publish(
-				TargetArn=self.topic_arn,
-				Message=message,
-				Subject=subject,
-				MessageStructure='json'
+				TargetArn = self.topic_arn,
+				Message = message,
+				Subject = subject,
+				MessageStructure = 'json'
 			)
 
+
+	def __json_convert(self, o):
+		if isinstance(o, datetime.datetime):
+			return o.__str__()
