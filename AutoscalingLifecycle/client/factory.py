@@ -40,11 +40,11 @@ class ClientFactory(object):
 		"""
 
 		self.logger.info('Retrieving client %s in region %s', name, region_name)
-		name = name + '_' + region_name
-		client = self.clients.get(name, None)
+		key = name + '_' + region_name
+		client = self.clients.get(key, None)
 		if client is None:
-			self.logger.debug('Client %s not created. Creating ...', name)
+			self.logger.debug('Client %s in region %s not created. Creating ...', name, region_name)
 			client = self.session.client(name, region_name = region_name)
-			self.clients.update({ name: client })
+			self.clients.update({ key: client })
 
 		return client
