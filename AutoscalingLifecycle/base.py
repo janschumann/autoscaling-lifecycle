@@ -118,7 +118,7 @@ class EventAction(object):
 
 		log_name = name + '::' + account + "::" + env
 		self.logger = LifecycleLogger(name = log_name.upper(), logger = logger)
-		self.__create_clients(name, session, notification_arn)
+		self.__create_clients(name, session, notification_arn, account, env)
 		self._populate_event_data(event)
 
 
