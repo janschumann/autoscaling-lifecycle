@@ -44,7 +44,7 @@ class SnsClient(object):
 				client = self.client_eu_west
 			else:
 				client = self.client_eu_central
-			client.publish_autoscaling_activity(
+			client.publish(
 				TargetArn = self.topic_arn,
 				Message = message,
 				Subject = subject,
