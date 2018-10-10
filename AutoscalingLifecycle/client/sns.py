@@ -53,7 +53,7 @@ class SnsClient(object):
 			client.publish(
 				TargetArn = self.topic_arn,
 				Message = message,
-				Subject = subject,
+				Subject = subject[:100],
 				MessageStructure = 'json'
 			)
 		else:
