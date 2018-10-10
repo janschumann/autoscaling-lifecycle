@@ -15,7 +15,9 @@ class OnAutoscalingEvent(EventAction):
 		self.logger.info('Loading data ...')
 
 		if event.get('source', '') != 'aws.autoscaling':
-			raise self.logger.get_error(TypeError, 'Event is not aws.autoscaling: %s', event.get('source', ''))
+			e = self.logger.get_error(TypeError, 'Event is not aws.autoscaling: %s', event.get('source', ''))
+			self.sns.publish_error(e, 'populate event data', 'eu-west-1')
+			raise e
 
 		super()._populate_event_data(event)
 
@@ -32,58 +34,66 @@ class OnAutoscalingEvent(EventAction):
 	def __call__(self):
 		self.logger.info('Executing %s ...', self.get_action_info())
 
-		if self.autoscaling_client.is_launching():
-			self.report_activity('is launching', self.event_details.get('AutoScalingGroupName'), self.event_details.get('EC2InstanceId'))
+		try:
+			if self.autoscaling_client.is_launching():
+				self.report_activity('is launching', self.event_details.get('AutoScalingGroupName'),
+									 self.event_details.get('EC2InstanceId'))
 
-			self.logger.set_name(self.logger.get_name() + '::OUT:: ')
+				self.logger.set_name(self.logger.get_name() + '::OUT:: ')
 
-			self.logger.info('Determine node type ...')
-			node_type = self._determine_node_type()
+				self.logger.info('Determine node type ...')
+				node_type = self._determine_node_type()
 
-			self.logger.info('Launching %s: %s', node_type, self.event_details.get('EC2InstanceId'))
+				self.logger.info('Launching %s: %s', node_type, self.event_details.get('EC2InstanceId'))
 
-			self.logger.info('Registering %s: %s', node_type, self.event_details.get('EC2InstanceId'))
-			data = self._get_registration_data()
-			self.logger.info('Data: %s', data)
-			self.node = self.node_repository.register(
-				self.event_details.get('EC2InstanceId'),
-				node_type,
-				data
-			)
-			self.logger.debug('Registered node data: %s', self.node.to_dict())
+				self.logger.info('Registering %s: %s', node_type, self.event_details.get('EC2InstanceId'))
+				data = self._get_registration_data()
+				self.logger.info('Data: %s', data)
+				self.node = self.node_repository.register(
+					self.event_details.get('EC2InstanceId'),
+					node_type,
+					data
+				)
+				self.logger.debug('Registered node data: %s', self.node.to_dict())
 
-			self.logger.debug('Waiting for cloud-init to finish ...')
-			time.sleep(60)
+				self.logger.debug('Waiting for cloud-init to finish ...')
+				time.sleep(60)
 
-			# delegate to specific event
-			self._on_launch()
+				# delegate to specific event
+				self._on_launch()
 
-		elif self.autoscaling_client.is_terminating():
-			self.logger.set_name(self.logger.get_name() + '::IN:: ')
+			elif self.autoscaling_client.is_terminating():
+				self.logger.set_name(self.logger.get_name() + '::IN:: ')
 
-			self.report_activity('is terminating', self.event_details.get('AutoScalingGroupName'), self.event_details.get('EC2InstanceId'))
+				self.report_activity('is terminating', self.event_details.get('AutoScalingGroupName'),
+									 self.event_details.get('EC2InstanceId'))
 
-			self.logger.info('Loading node %s from the db.', self.event_details.get('EC2InstanceId'))
-			try:
-				self.node = self.node_repository.get(self.event_details.get('EC2InstanceId'))
-			except TypeError as e:
-				self.logger.error('Could not load node. Trying to complete the lifecycle action.')
-				self.__gracefull_complete()
-				return True
+				self.logger.info('Loading node %s from the db.', self.event_details.get('EC2InstanceId'))
+				try:
+					self.node = self.node_repository.get(self.event_details.get('EC2InstanceId'))
+				except TypeError as e:
+					self.logger.error('Could not load node. Trying to complete the lifecycle action.')
+					self.__gracefull_complete()
+					return e
 
-			self.logger.info('Setting node status to "terminating"')
-			self.node_repository.update(self.node, {
-				'ItemStatus': 'terminating',
-				'LifecycleActionToken': self.event_details.get('LifecycleActionToken')
-			})
+				self.logger.info('Setting node status to "terminating"')
+				self.node_repository.update(self.node, {
+					'ItemStatus': 'terminating',
+					'LifecycleActionToken': self.event_details.get('LifecycleActionToken')
+				})
 
-			self.logger.info('Terminating %s: %s', self.node.get_type(), self.node.get_id())
+				self.logger.info('Terminating %s: %s', self.node.get_type(), self.node.get_id())
 
-			# delegate to specific event
-			self._on_terminate()
-			
-		else:
-			raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
+				# delegate to specific event
+				self._on_terminate()
+
+			else:
+				raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
+
+		except Exception as e:
+			self.sns.publish_error(e, 'scale', 'eu-west-1')
+			raise e
+
 
 	def _determine_node_type(self) -> str:
 		"""

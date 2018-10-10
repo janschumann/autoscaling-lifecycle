@@ -25,7 +25,9 @@ class OnSsmEvent(EventAction):
 		self.logger.info('Preparing event data ...')
 
 		if event.get('source', '') != 'aws.ssm':
-			raise self.logger.get_error(TypeError, 'Event is not aws.ssm: %s', event.get('source', ''))
+			e = self.logger.get_error(TypeError, 'Event is not aws.ssm: %s', event.get('source', ''))
+			self.sns.publish_error(e, 'populate event data', 'eu-west-1')
+			raise e
 
 		super()._populate_event_data(event)
 
@@ -33,9 +35,10 @@ class OnSsmEvent(EventAction):
 		self.command_data = self.command_repository.get(self.event_details.get('command-id'))
 		self.logger.debug('Command data: %s', self.command_data)
 		if type(self.command_data) is not dict:
-			raise self.logger.get_error(TypeError, 'Data for command %s could not be found.',
-										self.event_details.get('command-id'))
-
+			e = self.logger.get_error(TypeError, 'Data for command %s could not be found.',
+									  self.event_details.get('command-id'))
+			self.sns.publish_error(e, 'populate event data', 'eu-west-1')
+			raise e
 		if self.command_data.get('NotificationMetadata').get('debug', 'false') == 'true':
 			self.logger.set_debug()
 
@@ -53,45 +56,63 @@ class OnSsmEvent(EventAction):
 		"""
 		self.logger.info('Executing %s ...', self.get_action_info())
 
-		if self.event_details.get('status') != 'Success':
-			self.logger.warning('The command %s has ended with a %s status. Instance willbe abandoned.',
-								self.command_data.get('Comment'),
-								self.event_details.get('status'))
-			self.__gracefull_complete()
-
-		else:
-			self.logger.info('Loading node %s', self.command_data.get('EC2InstanceId'))
-			try:
-				self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
-			except TypeError as e:
-				self.logger.error('Could not load node: %s. Trying to complete the lifecycle action. Removing command.',
-								  repr(e))
+		try:
+			if self.event_details.get('status') != 'Success':
+				self.logger.warning('The command %s has ended with a %s status. Instance willbe abandoned.',
+									self.command_data.get('Comment'),
+									self.event_details.get('status'))
 				self.__gracefull_complete()
+				raise self.logger.get_error(RuntimeError, "The command %s has ended with a %s status")
 
-			if type(self.node) is Node:
+			else:
+				self.logger.info('Loading node %s', self.command_data.get('EC2InstanceId'))
 				try:
-					self.logger.debug('Loaded node data: %s', self.node.to_dict())
-
-					if self.autoscaling_client.is_launching():
-						self.logger.set_name(self.logger.get_name() + '::Launch:: ')
-						self.logger.info('Completing lifecycle action on launch')
-						self._on_launch()
-						self.report_activity('has launched', self.command_data.get('AutoScalingGroupName'), self.command_data.get('EC2InstanceId'))
-
-					elif self.autoscaling_client.is_terminating():
-						self.logger.set_name(self.logger.get_name() + '::Terminate:: ')
-						self.logger.info('Completing lifecycle action on termination')
-						self._on_terminate()
-						self.report_activity('has terminated', self.command_data.get('AutoScalingGroupName'), self.command_data.get('EC2InstanceId'))
-
-					else:
-						raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
-				except Exception as e:
+					self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
+				except TypeError as e:
 					self.logger.error(
-						'Something went wrong; %s. Now trying to at least complete the lifecycle action...', repr(e))
+						'Could not load node: %s. Trying to complete the lifecycle action. Removing command.',
+						repr(e)
+					)
 					self.__gracefull_complete()
 
-		self.command_repository.delete(self.event_details.get('command-id'))
+				if type(self.node) is Node:
+					try:
+						self.logger.debug('Loaded node data: %s', self.node.to_dict())
+
+						if self.autoscaling_client.is_launching():
+							self.logger.set_name(self.logger.get_name() + '::Launch:: ')
+							self.logger.info('Completing lifecycle action on launch')
+							self._on_launch()
+							self.report_activity(
+								'has launched',
+								self.command_data.get('AutoScalingGroupName'),
+								self.command_data.get('EC2InstanceId')
+							)
+
+						elif self.autoscaling_client.is_terminating():
+							self.logger.set_name(self.logger.get_name() + '::Terminate:: ')
+							self.logger.info('Completing lifecycle action on termination')
+							self._on_terminate()
+							self.report_activity(
+								'has terminated',
+								self.command_data.get('AutoScalingGroupName'),
+								self.command_data.get('EC2InstanceId')
+							)
+
+						else:
+							raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
+					except Exception as e:
+						self.logger.error(
+							'Something went wrong; %s. Now trying to at least complete the lifecycle action...',
+							repr(e)
+						)
+						self.__gracefull_complete()
+
+			self.command_repository.delete(self.event_details.get('command-id'))
+
+		except Exception as e:
+			self.sns.publish_error(e, 'complete', 'eu-west-1')
+			raise e
 
 
 	def __gracefull_complete(self):
@@ -104,8 +125,11 @@ class OnSsmEvent(EventAction):
 																								None) is not None:
 				self.node.set_property('LifecycleActionToken', self.command_data.get('LifecycleActionToken'))
 
-			self.complete_lifecycle_action(self.node.get_id(), self.node.get_property('LifecycleActionToken'),
-										   'ABANDON')
+			self.complete_lifecycle_action(
+				self.node.get_id(),
+				self.node.get_property('LifecycleActionToken'),
+				'ABANDON'
+			)
 			self.node_repository.delete(self.node)
 		except Exception as e:
 			self.logger.error('Failed to gracefully complete the action: %s', repr(e))

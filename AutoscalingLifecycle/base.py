@@ -6,8 +6,9 @@ from AutoscalingLifecycle.client.autoscaling import AutoscalingClient
 from AutoscalingLifecycle.client.dynamodb import DynamoDbClient
 from AutoscalingLifecycle.client.factory import ClientFactory
 from AutoscalingLifecycle.client.route53 import Route53Client
-from AutoscalingLifecycle.client.ssm import SsmClient
 from AutoscalingLifecycle.client.sns import SnsClient
+from AutoscalingLifecycle.client.ssm import SsmClient
+from AutoscalingLifecycle.entity.node import Node
 from AutoscalingLifecycle.helper.logger import LifecycleLogger
 from AutoscalingLifecycle.helper.waiters import Waiters
 from AutoscalingLifecycle.repository.command import CommandRepository
@@ -32,6 +33,8 @@ class EventAction(object):
 	:param event_details: The event details
 	:type mandatory_event_keys: list
 	:param mandatory_event_keys: a list of items needed to process an event
+	:type node: Node
+	:param node: The node in charge
 	"""
 	logger = None
 	session = None
@@ -47,6 +50,7 @@ class EventAction(object):
 		'resources',
 		'detail'
 	]
+	node = None
 
 
 	def __init__(self, name: str, event: dict, session: Session, logger: Logger, notification_arn, account, env):
@@ -216,4 +220,4 @@ class EventAction(object):
 	def report_activity(self, action, group, instance_id):
 		activity = self.autoscaling_client.get_autoscaling_activity(group, instance_id)
 		self.logger.info('Reporting activity: node %s: %s', action, activity)
-		self.sns.publish(action, activity, 'eu-west-1')
+		self.sns.publish_autoscaling_activity(action, activity, 'eu-west-1')
