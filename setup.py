@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
 	name = "AutoscalingLifecycle",
-	version = "0.5.1",
+	version = "0.5.2",
 	author = "Jan Schumann",
 	author_email = "js@schumann-it.com",
 	description = "A library to handle aws autoscaling lifecycle events",

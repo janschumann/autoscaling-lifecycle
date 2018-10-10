@@ -15,7 +15,11 @@ class SnsClient(object):
 
 
 	def publish_autoscaling_activity(self, action, activity, region = "eu-central-1"):
-		subject = self.logger.get_formatted_message("A node %s in %s", [action, self.env])
+		severity = 'INFO'
+		if activity.get('StatusCode') == 'Successful':
+			severity = "SUCCESS"
+
+		subject = self.logger.get_formatted_message(severity + ":A node %s in %s", [action, self.env])
 		result = json.dumps(activity, indent = 4, sort_keys = True, ensure_ascii = False,
 							default = self.__json_convert)
 		message = json.dumps({
@@ -28,7 +32,7 @@ class SnsClient(object):
 
 	def publish_error(self, exception, action, region = "eu-central-1"):
 		subject = self.logger.get_formatted_message(
-			'Error while performing %s in environment %s',
+			'ERROR: while performing %s in environment %s',
 			[action, self.env]
 		)
 		result = subject + "\n\n " + repr(exception)
