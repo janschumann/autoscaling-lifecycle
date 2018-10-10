@@ -1,5 +1,7 @@
 import datetime
 import json
+import sys
+from boltons.tbutils import ExceptionInfo
 
 
 class SnsClient(object):
@@ -32,10 +34,10 @@ class SnsClient(object):
 
 	def publish_error(self, exception, action, region = "eu-central-1"):
 		subject = self.logger.get_formatted_message(
-			'ERROR : while performing %s in environment %s',
-			[action, self.env]
+			'ERROR : while performing %s in environment %s: %s',
+			[action, self.env, repr(exception)]
 		)
-		result = subject + "\n\n " + repr(exception)
+		result = json.dumps(ExceptionInfo.from_current().to_dict(), indent = 4, sort_keys = True, ensure_ascii = False)
 		message = json.dumps({
 			'default': result,
 		}, indent = 4, sort_keys = True, ensure_ascii = False)

@@ -1,2 +1,3 @@
 boto3>=1.7.5
 botocore>=1.10.55
+tbutils=>0.4.2

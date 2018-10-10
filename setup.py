@@ -3,6 +3,8 @@ import setuptools
 with open("README.md", "r") as fh:
 	long_description = fh.read()
 
+requires = ['tbutils>=0.4.2,<1.0.0']
+
 setuptools.setup(
 	name = "AutoscalingLifecycle",
 	version = "0.5.4",
@@ -11,6 +13,7 @@ setuptools.setup(
 	description = "A library to handle aws autoscaling lifecycle events",
 	long_description = long_description,
 	long_description_content_type = "text/markdown",
+	install_requires = requires,
 	url = "https://github.com/7NXT/infrastructure-autoscaling-lifecycle",
 	packages = setuptools.find_packages(),
 	classifiers = (
