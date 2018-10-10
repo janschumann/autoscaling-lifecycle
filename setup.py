@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
 	long_description = fh.read()
 
-requires = ['boltons=>18.0.1,<19.0.0']
+requires = ['boltons>=18.0.1,<19.0.0']
 
 setuptools.setup(
 	name = "AutoscalingLifecycle",
