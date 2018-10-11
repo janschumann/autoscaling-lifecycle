@@ -84,13 +84,18 @@ class AutoscalingClient(object):
 		)
 
 
-	def get_autoscaling_activity(self, group, instance_id):
+	def get_autoscaling_activity(self, group, action, instance_id):
 		activities = self.client.describe_scaling_activities(
 			AutoScalingGroupName = group
 		)['Activities']
 
+		if action == "is launching" or action == "has launched":
+			desc = "Launching a new EC2 instance: " + instance_id
+		else:
+			desc = "Terminating EC2 instance: " + instance_id
+
 		for activity in activities:
-			if activity.get('Description').find(instance_id):
+			if activity.get('Description') == desc:
 				return activity
 
 		return {}

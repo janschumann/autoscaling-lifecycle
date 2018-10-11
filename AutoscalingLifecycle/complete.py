@@ -55,7 +55,6 @@ class OnSsmEvent(EventAction):
 		when an instance is launching or terminating
 		"""
 		self.logger.info('Executing %s ...', self.get_action_info())
-		activity = ""
 
 		try:
 			if self.event_details.get('status') != 'Success':
@@ -84,14 +83,21 @@ class OnSsmEvent(EventAction):
 							self.logger.set_name(self.logger.get_name() + '::Launch:: ')
 							self.logger.info('Completing lifecycle action on launch')
 							self._on_launch()
-							activity = 'has launched'
+							self.report_activity(
+								'has launched',
+								self.command_data.get('AutoScalingGroupName'),
+								self.command_data.get('EC2InstanceId')
+							)
 
 						elif self.autoscaling_client.is_terminating():
 							self.logger.set_name(self.logger.get_name() + '::Terminate:: ')
 							self.logger.info('Completing lifecycle action on termination')
 							self._on_terminate()
-							activity = 'has terminated'
-
+							self.report_activity(
+								'has terminated',
+								self.command_data.get('AutoScalingGroupName'),
+								self.command_data.get('EC2InstanceId')
+							)
 						else:
 							raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
 					except Exception as e:
@@ -102,11 +108,6 @@ class OnSsmEvent(EventAction):
 						self.__gracefull_complete()
 
 			self.command_repository.delete(self.event_details.get('command-id'))
-			self.report_activity(
-				activity,
-				self.command_data.get('AutoScalingGroupName'),
-				self.command_data.get('EC2InstanceId')
-			)
 
 		except Exception as e:
 			self.sns.publish_error(e, 'complete', 'eu-west-1')

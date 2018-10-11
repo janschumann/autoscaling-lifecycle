@@ -16,12 +16,12 @@ class SnsClient(object):
 		self.env = env
 
 
-	def publish_autoscaling_activity(self, action, activity, region = "eu-central-1"):
+	def publish_autoscaling_activity(self, activity, region = "eu-central-1"):
 		severity = 'INFO'
 		if activity.get('StatusCode') == 'Successful':
 			severity = "SUCCESS"
 
-		subject = self.logger.get_formatted_message(severity + " : A node %s in %s", [action, self.env])
+		subject = self.logger.get_formatted_message("%s : %s in %s", [severity, activity.get('Description'), self.env])
 		result = json.dumps(activity, indent = 4, sort_keys = True, ensure_ascii = False,
 							default = self.__json_convert)
 		message = json.dumps({
