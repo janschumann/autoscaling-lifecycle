@@ -64,47 +64,53 @@ class OnSsmEvent(EventAction):
 				self.__gracefull_complete()
 
 			else:
-				self.logger.info('Loading node %s', self.command_data.get('EC2InstanceId'))
-				try:
-					self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
-				except TypeError as e:
-					self.logger.error(
-						'Could not load node: %s. Trying to complete the lifecycle action. Removing command.',
-						repr(e)
-					)
-					self.__gracefull_complete()
-
-				if type(self.node) is Node:
+				if self.command_data.get('action') is not 'none':
+					self.logger.info('Loading node %s', self.command_data.get('EC2InstanceId'))
 					try:
-						self.logger.debug('Loaded node data: %s', self.node.to_dict())
-
-						if self.autoscaling_client.is_launching():
-							self.logger.set_name(self.logger.get_name() + '::Launch:: ')
-							self.logger.info('Completing lifecycle action on launch')
-							self._on_launch()
-							self.report_activity(
-								'has launched',
-								self.command_data.get('AutoScalingGroupName'),
-								self.command_data.get('EC2InstanceId')
-							)
-
-						elif self.autoscaling_client.is_terminating():
-							self.logger.set_name(self.logger.get_name() + '::Terminate:: ')
-							self.logger.info('Completing lifecycle action on termination')
-							self._on_terminate()
-							self.report_activity(
-								'has terminated',
-								self.command_data.get('AutoScalingGroupName'),
-								self.command_data.get('EC2InstanceId')
-							)
-						else:
-							raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
-					except Exception as e:
+						self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
+					except TypeError as e:
 						self.logger.error(
-							'Something went wrong; %s. Now trying to at least complete the lifecycle action...',
+							'Could not load node: %s. Trying to complete the lifecycle action. Removing command.',
 							repr(e)
 						)
 						self.__gracefull_complete()
+
+					if type(self.node) is Node:
+						try:
+							self.logger.debug('Loaded node data: %s', self.node.to_dict())
+
+							if self.autoscaling_client.is_launching():
+								self.logger.set_name(self.logger.get_name() + '::Launch:: ')
+								self.logger.info('Completing lifecycle action on launch')
+								self._on_launch()
+								self.report_autoscaling_activity(
+									'has launched',
+									self.command_data.get('AutoScalingGroupName'),
+									self.command_data.get('EC2InstanceId')
+								)
+
+							elif self.autoscaling_client.is_terminating():
+								self.logger.set_name(self.logger.get_name() + '::Terminate:: ')
+								self.logger.info('Completing lifecycle action on termination')
+								self._on_terminate()
+								self.report_autoscaling_activity(
+									'has terminated',
+									self.command_data.get('AutoScalingGroupName'),
+									self.command_data.get('EC2InstanceId')
+								)
+							else:
+								raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
+						except Exception as e:
+							self.logger.error(
+								'Something went wrong; %s. Now trying to at least complete the lifecycle action...',
+								repr(e)
+							)
+							self.__gracefull_complete()
+				else:
+					self.report_activity(
+						self.command_data.get('Comment'),
+						self.command_data.get('RunningOn')
+					)
 
 		except Exception as e:
 			self.sns.publish_error(e, 'complete', 'eu-west-1')

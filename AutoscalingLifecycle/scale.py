@@ -36,8 +36,8 @@ class OnAutoscalingEvent(EventAction):
 
 		try:
 			if self.autoscaling_client.is_launching():
-				self.report_activity('is launching', self.event_details.get('AutoScalingGroupName'),
-									 self.event_details.get('EC2InstanceId'))
+				self.report_autoscaling_activity('is launching', self.event_details.get('AutoScalingGroupName'),
+												 self.event_details.get('EC2InstanceId'))
 
 				self.logger.set_name(self.logger.get_name() + '::OUT:: ')
 
@@ -65,8 +65,8 @@ class OnAutoscalingEvent(EventAction):
 			elif self.autoscaling_client.is_terminating():
 				self.logger.set_name(self.logger.get_name() + '::IN:: ')
 
-				self.report_activity('is terminating', self.event_details.get('AutoScalingGroupName'),
-									 self.event_details.get('EC2InstanceId'))
+				self.report_autoscaling_activity('is terminating', self.event_details.get('AutoScalingGroupName'),
+												 self.event_details.get('EC2InstanceId'))
 
 				self.logger.info('Loading node %s from the db.', self.event_details.get('EC2InstanceId'))
 				try:

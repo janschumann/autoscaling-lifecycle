@@ -32,6 +32,16 @@ class SnsClient(object):
 		self.__do_publish(subject, message, region)
 
 
+	def publish_activity(self, action, instance_id, region = "eu-central-1"):
+		subject = self.logger.get_formatted_message("SUCCESS : Finished %s on %s", [action, instance_id])
+		message = json.dumps({
+			'default': subject,
+			'sms': subject,
+			'email': subject
+		}, indent = 4, sort_keys = True, ensure_ascii = False)
+		self.__do_publish(subject, message, region)
+
+
 	def publish_error(self, exception, action, region = "eu-central-1"):
 		subject = self.logger.get_formatted_message(
 			'ERROR : while performing %s in environment %s: %s',

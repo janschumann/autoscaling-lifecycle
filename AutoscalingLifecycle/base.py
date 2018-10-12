@@ -217,7 +217,12 @@ class EventAction(object):
 		)
 
 
-	def report_activity(self, action, group, instance_id):
+	def report_autoscaling_activity(self, action, group, instance_id):
 		activity = self.autoscaling_client.get_autoscaling_activity(group, action, instance_id)
 		self.logger.info('Reporting activity: node %s: %s', action, activity)
 		self.sns.publish_autoscaling_activity(activity, 'eu-west-1')
+
+
+	def report_activity(self, action, instance_id):
+		self.logger.info('Reporting activity: %s on %s', action, instance_id)
+		self.sns.publish_activity(action, instance_id, 'eu-west-1')
