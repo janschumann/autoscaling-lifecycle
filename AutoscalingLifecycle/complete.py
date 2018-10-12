@@ -64,7 +64,7 @@ class OnSsmEvent(EventAction):
 				self.__gracefull_complete()
 
 			else:
-				if self.command_data.get('action') is not 'none':
+				if self.command_data.get('action', 'autoscaling') == 'autoscaling':
 					self.logger.info('Loading node %s', self.command_data.get('EC2InstanceId'))
 					try:
 						self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
