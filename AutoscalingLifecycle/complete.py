@@ -58,11 +58,10 @@ class OnSsmEvent(EventAction):
 
 		try:
 			if self.event_details.get('status') != 'Success':
-				self.logger.warning('The command %s has ended with a %s status. Instance willbe abandoned.',
+				self.logger.warning('The command %s has ended with a %s status. Instance will be abandoned.',
 									self.command_data.get('Comment'),
 									self.event_details.get('status'))
 				self.__gracefull_complete()
-				raise self.logger.get_error(RuntimeError, "The command %s has ended with a %s status")
 
 			else:
 				self.logger.info('Loading node %s', self.command_data.get('EC2InstanceId'))
@@ -107,12 +106,12 @@ class OnSsmEvent(EventAction):
 						)
 						self.__gracefull_complete()
 
-			self.command_repository.delete(self.event_details.get('command-id'))
-
 		except Exception as e:
 			self.sns.publish_error(e, 'complete', 'eu-west-1')
+			self.command_repository.delete(self.event_details.get('command-id'))
 			raise e
 
+		self.command_repository.delete(self.event_details.get('command-id'))
 
 	def __gracefull_complete(self):
 		try:
@@ -120,16 +119,19 @@ class OnSsmEvent(EventAction):
 				self.node = Node(self.command_data.get('EC2InstanceId'), 'unknown')
 
 			self.node.set_status('terminating')
-			if self.node.get_property('LifecycleActionToken') is None and self.command_data.get('LifecycleActionToken',
-																								None) is not None:
-				self.node.set_property('LifecycleActionToken', self.command_data.get('LifecycleActionToken'))
+			node_id = self.node.get_id()
+			if self.node.get_property('LifecycleActionToken') is not None:
+				token = self.node.get_property('LifecycleActionToken')
+			else:
+				token = self.command_data.get('LifecycleActionToken')
+
+			self.node_repository.delete(self.node)
 
 			self.complete_lifecycle_action(
-				self.node.get_id(),
-				self.node.get_property('LifecycleActionToken'),
+				node_id,
+				token,
 				'ABANDON'
 			)
-			self.node_repository.delete(self.node)
 		except Exception as e:
 			self.logger.error('Failed to gracefully complete the action: %s', repr(e))
 
