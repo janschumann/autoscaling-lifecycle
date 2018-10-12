@@ -61,7 +61,8 @@ class OnSsmEvent(EventAction):
 				self.logger.warning('The command %s has ended with a %s status. Instance will be abandoned.',
 									self.command_data.get('Comment'),
 									self.event_details.get('status'))
-				self.__gracefull_complete()
+				if self.command_data.get('action', 'autoscaling') == 'autoscaling':
+					self.__gracefull_complete()
 
 			else:
 				if self.command_data.get('action', 'autoscaling') == 'autoscaling':
