@@ -47,6 +47,10 @@ class LifecycleLogger(object):
 		self.logger.error(self.get_formatted_message(message, args))
 
 
+	def exception(self, message: str, *args):
+		self.logger.exception(self.get_formatted_message(message, args))
+
+
 	def warning(self, message: str, *args):
 		self.logger.warning(self.get_formatted_message(message, args))
 

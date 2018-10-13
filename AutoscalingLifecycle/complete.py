@@ -70,11 +70,12 @@ class OnSsmEvent(EventAction):
 					try:
 						self.node = self.node_repository.get(self.command_data.get('EC2InstanceId'))
 					except TypeError as e:
-						self.logger.error(
+						self.logger.exception(
 							'Could not load node: %s. Trying to complete the lifecycle action. Removing command.',
 							repr(e)
 						)
 						self.__gracefull_complete()
+						raise e
 
 					if type(self.node) is Node:
 						try:
@@ -102,11 +103,12 @@ class OnSsmEvent(EventAction):
 							else:
 								raise self.logger.get_error(RuntimeError, 'Instance transition could not be determined.')
 						except Exception as e:
-							self.logger.error(
+							self.logger.exception(
 								'Something went wrong; %s. Now trying to at least complete the lifecycle action...',
 								repr(e)
 							)
 							self.__gracefull_complete()
+							raise e
 				else:
 					self.report_activity(
 						self.command_data.get('Comment'),
@@ -120,19 +122,30 @@ class OnSsmEvent(EventAction):
 
 		self.command_repository.delete(self.event_details.get('command-id'))
 
+
 	def __gracefull_complete(self):
 		try:
 			if not hasattr(self, 'node') or type(self.node) is None:
+				self.logger.warning("Node has not been loaded. Using basic ")
 				self.node = Node(self.command_data.get('EC2InstanceId'), 'unknown')
+			else:
+				try:
+					self.node_repository.update(self.node, {
+						'ItemStatus': 'terminating'
+					})
+				except Exception:
+					self.logger.warning("Node status could not be updated while gracefully completing lifecycle for %s", self.node.get_id())
 
-			self.node.set_status('terminating')
 			node_id = self.node.get_id()
 			if self.node.get_property('LifecycleActionToken') is not None:
 				token = self.node.get_property('LifecycleActionToken')
 			else:
 				token = self.command_data.get('LifecycleActionToken')
 
-			self.node_repository.delete(self.node)
+			try:
+				self.node_repository.delete(self.node)
+			except Exception:
+				self.logger.warning("Node could not be deleted while gracefully completing lifecycle for %s", self.node.get_id())
 
 			self.complete_lifecycle_action(
 				node_id,
@@ -140,7 +153,7 @@ class OnSsmEvent(EventAction):
 				'ABANDON'
 			)
 		except Exception as e:
-			self.logger.error('Failed to gracefully complete the action: %s', repr(e))
+			self.logger.exception('Failed to gracefully complete the action %s: %s', self.command_data, repr(e))
 
 		self.node = None
 

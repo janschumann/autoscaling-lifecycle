@@ -15,6 +15,9 @@ class Node(object):
 
 
 	def __init__(self, id, node_type):
+		if id == "" or id is None or node_type == "" or node_type is None:
+			raise TypeError("id and node_type must not be empty")
+
 		self.data = { }
 		self.id = id
 		self.data.update({ 'EC2InstanceId': self.id })

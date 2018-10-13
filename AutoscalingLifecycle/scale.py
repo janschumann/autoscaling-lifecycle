@@ -72,7 +72,7 @@ class OnAutoscalingEvent(EventAction):
 				try:
 					self.node = self.node_repository.get(self.event_details.get('EC2InstanceId'))
 				except TypeError as e:
-					self.logger.error('Could not load node. Trying to complete the lifecycle action.')
+					self.logger.exception('Could not load node. Trying to complete the lifecycle action.')
 					self.__gracefull_complete()
 					return e
 
