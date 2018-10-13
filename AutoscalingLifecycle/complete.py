@@ -58,11 +58,19 @@ class OnSsmEvent(EventAction):
 
 		try:
 			if self.event_details.get('status') != 'Success':
-				self.logger.warning('The command %s has ended with a %s status. Instance will be abandoned.',
-									self.command_data.get('Comment'),
-									self.event_details.get('status'))
 				if self.command_data.get('action', 'autoscaling') == 'autoscaling':
+					self.logger.warning('The command %s has ended with a %s status. Instance will be abandoned.',
+						self.command_data.get('Comment'),
+						self.event_details.get('status')
+					)
 					self.__gracefull_complete()
+				else:
+					self.logger.error('The command %s ended with a %s status.',
+						self.command_data.get('Comment'),
+						self.event_details.get('status')
+					)
+
+				raise self.logger.get_error(RuntimeError, 'The command %s has ended with a %s status, %s', self.command_data.get('Comment'))
 
 			else:
 				if self.command_data.get('action', 'autoscaling') == 'autoscaling':
