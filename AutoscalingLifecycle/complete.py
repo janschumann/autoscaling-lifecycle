@@ -70,7 +70,11 @@ class OnSsmEvent(EventAction):
 						self.event_details.get('status')
 					)
 
-				raise self.logger.get_error(RuntimeError, 'The command %s has ended with a %s status, %s', self.command_data.get('Comment'))
+				raise self.logger.get_error(RuntimeError,
+						self.logger.get_formatted_message('The command %s has ended with a %s status',
+						[self.command_data, self.event_details.get('status')]
+					)
+				)
 
 			else:
 				if self.command_data.get('action', 'autoscaling') == 'autoscaling':
