@@ -56,9 +56,8 @@ class OnAutoscalingEvent(EventAction):
 				)
 				self.logger.debug('Registered node data: %s', self.node.to_dict())
 
-				# @todo removed for testing. if launch error rate does not increase, remove them completwly
-				#self.logger.debug('Waiting for cloud-init to finish ...')
-				#time.sleep(60)
+				self.logger.debug('Waiting for cloud-init to finish ...')
+				time.sleep(30)
 
 				# delegate to specific event
 				self._on_launch()
