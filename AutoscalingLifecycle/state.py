@@ -32,11 +32,11 @@ class StateHandler(object):
 
         self.logger.debug('looking for current state for node %s', __node)
         for __state in self.__operations.keys():
-            self.logger.debug(
-                'trying %s. state is %s, proceed is %s'
-                , __state, __node.get_state(), self._proceed
-            )
-            if __state == __node.get_state() and self._proceed:
+            if not self._proceed:
+                self.logger.debug('operation has been canceled by previous operation')
+                break
+
+            if __state == __node.get_state():
                 self.logger.debug('state %s matched. proceeding ...', __state)
                 for __trigger in self.__operations.get(__state):
                     if not self._proceed:
