@@ -31,7 +31,7 @@ class StateHandler(object):
         self.__initialize_state(__node)
 
         for __op in self.__operations.keys():
-            if __op == __node.get_state():
+            if __op == __node.get_state() and self._proceed:
                 for __trigger in self.__operations.get(__op):
                     func = getattr(self, __trigger.get('name'))
                     func(__node)
@@ -72,9 +72,6 @@ class StateHandler(object):
 
         self.__operations.update({ source: operations })
         for __op in operations:
-            # each operation can stop further processing
-            # always check this first
-            __conditions = [self.__do_proceed] + __op.get('conditions', [])
             # first log the event, than do the action
             __before = [self.__log_before] + __op.get('before', [])
             # first do the action, than update node state and log the event
@@ -87,16 +84,12 @@ class StateHandler(object):
                 __op.get('name'),
                 self.__states.get(source),
                 self.__states.get(dest),
-                conditions = __conditions,
+                conditions = __op.get('conditions', []),
                 unless = __op.get('unless', []),
                 before = __before,
                 after = __after,
                 prepare = __op.get('prepare', [])
             )
-
-
-    def __do_proceed(self, event_data: EventData):
-        return self._proceed
 
 
     def __log_transition(self, direction: str, event_data: EventData):
