@@ -1,77 +1,95 @@
 class Node(object):
-	id = None
-	type = None
-	status = 'pending'
-	data = { }
-	mandatory_propertoes = [
-		'EC2InstanceId',
-		'ItemType',
-		'ItemStatus',
-	]
-	readonly_propertoes = [
-		'EC2InstanceId',
-		'ItemType',
-	]
+    id = None
+    type = None
+    status = 'new'
+    data = { }
+    mandatory_propertoes = [
+        'EC2InstanceId',
+        'ItemType',
+        'ItemStatus',
+    ]
+    readonly_propertoes = [
+        'EC2InstanceId',
+        'ItemType',
+    ]
 
 
-	def __init__(self, id, node_type):
-		if id == "" or id is None or node_type == "" or node_type is None:
-			raise TypeError("id and node_type must not be empty")
+    def __init__(self, id, node_type):
+        if id == "" or id is None or node_type == "" or node_type is None:
+            raise TypeError("id and node_type must not be empty")
 
-		self.data = { }
-		self.id = id
-		self.data.update({ 'EC2InstanceId': self.id })
-		self.type = node_type
-		self.data.update({ 'ItemType': self.type })
-		self.data.update({ 'ItemStatus': self.status })
-
-
-	def get_id(self):
-		return self.id
+        self.data = { }
+        self.id = id
+        self.data.update({ 'EC2InstanceId': self.id })
+        self.type = node_type
+        self.data.update({ 'ItemType': self.type })
+        self.data.update({ 'ItemStatus': self.status })
 
 
-	def get_type(self):
-		return self.type
+    def get_id(self):
+        return self.id
 
 
-	def get_status(self):
-		return self.status
+    def get_type(self):
+        return self.type
 
 
-	def set_status(self, status):
-		self.status = status
-		self.data.update({ 'ItemStatus': self.status })
+    def get_status(self):
+        return self.status
 
 
-	def get_property(self, property, default = None):
-		return self.data.get(property, default)
+    def set_status(self, status):
+        self.status = status
+        self.data.update({ 'ItemStatus': self.status })
 
 
-	def set_property(self, property, value):
-		if property in self.readonly_propertoes:
-			raise TypeError(property + ' is read only.')
-
-		if property == 'ItemStatus':
-			self.set_status(value)
-		else:
-			self.data.update({ property: value })
+    def get_property(self, property, default = None):
+        return self.data.get(property, default)
 
 
-	def unset_property(self, property):
-		if property in self.mandatory_propertoes:
-			raise TypeError(property + ' cannot be unset.')
+    def set_property(self, property, value):
+        if property in self.readonly_propertoes:
+            raise TypeError(property + ' is read only.')
 
-		_ = self.data.pop(property)
+        if property == 'ItemStatus':
+            self.set_status(value)
+        else:
+            self.data.update({ property: value })
 
 
-	def is_valid(self):
-		return self.id != ''
+    def unset_property(self, property):
+        if property in self.mandatory_propertoes:
+            raise TypeError(property + ' cannot be unset.')
+
+        _ = self.data.pop(property)
 
 
-	def to_dict(self):
-		return {
-			'id': self.id,
-			'type': self.type,
-			'status': self.status,
-			'data': self.data
-		}
+    def is_valid(self):
+        return self.id != ''
+
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'type': self.type,
+            'status': self.status,
+            'data': self.data
+        }
+
+
+    def set_state(self, dest):
+        self.set_status(dest)
+
+
+    def get_state(self):
+        return self.status
+
+
+    def is_new(self):
+        return self.status == 'new'
+
+
+    def set_id(self, ident):
+        self.id = ident
+        self.data.update({ 'EC2InstanceId': self.id })
+

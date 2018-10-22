@@ -2,52 +2,9 @@ from transitions import EventData
 from transitions import Machine
 from transitions import State
 
-from AutoscalingLifecycle.base import Event
+from AutoscalingLifecycle.event import Event
 from AutoscalingLifecycle.helper.logger import LifecycleLogger
-
-
-class Node(object):
-    id = ""
-    node_type = "worker"
-
-
-    def __init__(self):
-        self.state = 'new'
-
-
-    def get_id(self):
-        return self.id
-
-
-    def set_id(self, id):
-        self.id = id
-
-
-    def is_new(self):
-        return self.state == 'new'
-
-
-    def is_manager(self):
-        return self.node_type == 'manager'
-
-
-    def is_worker(self):
-        return self.node_type == 'worker'
-
-
-    def set_state(self, state: str):
-        self.state = state
-
-
-    def get_state(self):
-        return self.state
-
-
-    def to_dict(self):
-        return {
-            'state': self.state,
-            'id': self.id
-        }
+from AutoscalingLifecycle.entity.node import Node
 
 
 class StateHandler(object):
@@ -146,7 +103,7 @@ class StateHandler(object):
         self.logger.info(
             '%s node %s from %s to %s via %s',
             direction,
-            self._get_node(event_data).get_id(),
+            event_data.args[0].get_id(),
             event_data.transition.source,
             event_data.transition.dest,
             event_data.event.name
@@ -162,10 +119,5 @@ class StateHandler(object):
 
 
     def __update_node(self, event_data: EventData):
-        __node = self._get_node(event_data)
+        __node = event_data.args[0]
         __node.set_state(event_data.transition.dest)
-
-
-    # @todo move to subclassed EventData
-    def _get_node(self, event_data: EventData) -> Node:
-        return event_data.args[0]
