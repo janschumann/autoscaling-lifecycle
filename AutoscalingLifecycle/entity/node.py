@@ -33,6 +33,9 @@ class Node(object):
     def get_type(self):
         return self.type
 
+    def set_type(self, node_type):
+        self.type = node_type
+        self.data.update({ 'ItemType': self.type })
 
     def get_status(self):
         return self.status
