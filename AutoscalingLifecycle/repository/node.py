@@ -26,7 +26,7 @@ class NodeRepository(object):
 
     def get(self, id: str):
         item = self.client.get_item(id)
-        if item is {}:
+        if item == {}:
             node = Node(id, 'unknown')
         else:
             node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
