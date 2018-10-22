@@ -120,4 +120,6 @@ class StateHandler(object):
 
     def __update_node(self, event_data: EventData):
         __node = event_data.args[0]
-        __node.set_state(event_data.transition.dest)
+        self.repositories.get('node').update(__node, {
+            'ItemStatus': event_data.transition.dest
+        })
