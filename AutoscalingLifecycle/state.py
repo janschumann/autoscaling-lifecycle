@@ -37,15 +37,13 @@ class StateHandler(object):
                 , __state, __node.get_state(), self._proceed
             )
             if __state == __node.get_state() and self._proceed:
-                self.logger.debug(
-                    'state %s matched'
-                    , __state
-                )
+                self.logger.debug('state %s matched. proceeding ...', __state)
                 for __trigger in self.__operations.get(__state):
-                    self.logger.debug(
-                        'pulling trigger %s'
-                        , __trigger.get('name')
-                    )
+                    if not self._proceed:
+                        self.logger.debug('operation has been canceled by previous operation')
+                        break
+
+                    self.logger.debug('pulling trigger %s', __trigger.get('name'))
                     func = getattr(self, __trigger.get('name'))
                     func(__node)
 
