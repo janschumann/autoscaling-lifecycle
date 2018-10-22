@@ -30,9 +30,22 @@ class StateHandler(object):
 
         self.__initialize_state(__node)
 
-        for __op in self.__operations.keys():
-            if __op == __node.get_state() and self._proceed:
-                for __trigger in self.__operations.get(__op):
+        self.logger.debug('looking for current state for node %s', __node)
+        for __state in self.__operations.keys():
+            self.logger.debug(
+                'trying %s. state is %s, proceed is %s'
+                , __state, __node.get_state(), self._proceed
+            )
+            if __state == __node.get_state() and self._proceed:
+                self.logger.debug(
+                    'state %s matched'
+                    , __state
+                )
+                for __trigger in self.__operations.get(__state):
+                    self.logger.debug(
+                        'pulling trigger %s'
+                        , __trigger.get('name')
+                    )
                     func = getattr(self, __trigger.get('name'))
                     func(__node)
 
