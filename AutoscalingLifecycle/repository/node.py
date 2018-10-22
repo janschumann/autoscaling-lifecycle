@@ -16,10 +16,13 @@ class NodeRepository(object):
         for k, v in data.items():
             node.set_property(k, v)
 
-        self.client.put_item(node.id, node.type, node.data)
+        self.put(node)
 
         return node
 
+
+    def put(self, node):
+        self.client.put_item(node.id, node.type, node.data)
 
     def get(self, id: str):
         item = self.client.get_item(id)
