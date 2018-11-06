@@ -47,16 +47,32 @@ class Docker(StateHandler):
                 },
                 {
                     'source': 'initializing',
-                    'dest': 'ready',
+                    'dest': 'labeled',
                     'operations': [
                         {
                             'name': 'add_labels',
                             'conditions': [self.is_worker],
-                            'before': [self.do_add_labels],
-                        },
+                            'before': [self.do_add_labels],                            'internal': True
+                        }
+                    ]
+                },
+                {
+                    'source': ['initializing', 'labeled'],
+                    'dest': 'online',
+                    'operations': [
                         {
                             'name': 'update_swarm_dns',
-                            'before': [self.do_update_swarm_dns],
+                            'after': [self.do_update_swarm_dns],
+                        }
+                    ]
+                },
+                {
+                    'source': 'online',
+                    'dest': 'ready',
+                    'operations': [
+                        {
+                            'name': 'complete',
+                            'before': [self.do_complete],
                         }
                     ]
                 },
@@ -68,17 +84,13 @@ class Docker(StateHandler):
                             'name': 'rebalance_services',
                             'conditions': [self.is_worker],
                             'before': [self.do_rebalance_services],
-                        },
-                        {
-                            'name': 'complete',
-                            'before': [self.do_complete],
                         }
                     ]
                 }
             ],
             'terminating': [
                 {
-                    'source': 'running',
+                    'source': '*',
                     'dest': 'terminating',
                     'operations': [
                         {
@@ -125,7 +137,7 @@ class Docker(StateHandler):
 
     def do_add_labels(self, event_data: EventData):
         self.logger.info('adding labels on node %s', self._node.to_dict())
-
+        self._proceed = False
 
     def do_complete(self, event_data: EventData):
         self.logger.info('completing autoscaling action for node %s', self._node.to_dict())
@@ -174,7 +186,7 @@ class NodeRepository(object):
     def __init__(self):
         self.nodes = { }
         _node = Node('existing_node', 'worker')
-        _node.set_state('ready')
+        _node.set_state('labeled')
         self.nodes.update({ _node.id: _node })
 
 
@@ -197,8 +209,8 @@ class NodeRepository(object):
 
 node_repository = NodeRepository()
 
-message = json.load(open('autoscaling_event.json', 'r'))
-# message = json.load(open('ssm_event.json', 'r'))
+#message = json.load(open('autoscaling_event.json', 'r'))
+message = json.load(open('ssm_event.json', 'r'))
 
 f = LoggerFactory('DOCKER-SWARM::BACKEND::QA', logging.DEBUG)
 f.add_handler(logging.StreamHandler(), '%(asctime)s - %(levelname)s - %(message)s')
@@ -206,8 +218,8 @@ f.add_handler(logging.StreamHandler(), '%(asctime)s - %(levelname)s - %(message)
 client_factory = ClientFactory(Session(profile_name='7nxt-backend-qa'), f.get_logger())
 waiters = CustomWaiters(client_factory, f.get_logger())
 
-h = SnsHandler(client_factory.get('sns', 'eu-west-1'), "arn:aws:sns:eu-west-1:676446623848:autoscaling")
-f.add_handler(h, '%(message)s')
+#h = SnsHandler(client_factory.get('sns', 'eu-west-1'), "arn:aws:sns:eu-west-1:676446623848:autoscaling")
+#f.add_handler(h, '%(message)s')
 
 l = f.get_logger()
 
@@ -222,9 +234,9 @@ elif message.get('source') == 'aws.ssm':
         "AutoScalingGroupName": "sampleASG",
         "LifecycleHookName": "SampleLifecycleHook-12345",
         "EC2InstanceId": "existing_node",
-        "LifecycleTransition": "autoscaling:EC2_INSTANCE_TERMINATING",
+        "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
         "NotificationMetadata": {
-            "type": "worker"
+            "type": "manager"
         }
     }
     e = SsmEvent(message, command)

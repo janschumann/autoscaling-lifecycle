@@ -13,10 +13,10 @@
     "LifecycleActionToken": "c613620e-07e2-4ed2-a9e2-ef8258911ade",
     "AutoScalingGroupName": "sampleASG",
     "LifecycleHookName": "SampleLifecycleHook-12345",
-    "EC2InstanceId": "i-0c683c9448b801b8b",
+    "EC2InstanceId": "existing_node",
     "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
     "NotificationMetadata": {
-      "type": "worker"
+      "type": "manager"
     }
   }
 }

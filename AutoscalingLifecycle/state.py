@@ -58,35 +58,34 @@ class StateHandler(object):
 
         for __transition in __transitions:
             self.__add_transition(
-                source = __transition.get('source'),
+                sources = __transition.get('source'),
                 dest = __transition.get('dest'),
                 operations = __transition.get('operations')
             )
 
 
-    def __add_transition(self, operations: list, source: str, dest: str):
-        if source not in self.__states.keys():
-            self.__states.update({ source: State(source) })
-            self.machine.add_state(self.__states.get(source))
+    def __add_transition(self, operations: list, sources, dest: str):
+        if type(sources) is not list:
+            sources = [sources]
 
-        if dest not in self.__states.keys():
-            self.__states.update({ dest: State(dest) })
-            self.machine.add_state(self.__states.get(dest))
+        for __op in operations:
+            self.__operations.update({__op.get('name'): {
+                'sources': sources
+            }})
 
-        self.__operations.update({ source: operations })
+        self.machine.add_state(dest)
+        self.machine.add_state(sources)
+
         for __op in operations:
             # first log the event, than do the action
             __before = [self.__log_before] + __op.get('before', [])
-            # first do the action, than update node state and log the event
-            __after = __op.get('after', []) + [
-                self.__update_node,
-                self.__log_after
-            ]
+            # first update the node, than do the action and log the event
+            __after = [self.__update_node] +  __op.get('after', []) + [self.__log_after]
 
             self.machine.add_transition(
                 __op.get('name'),
-                self.__states.get(source),
-                self.__states.get(dest),
+                sources,
+                dest,
                 conditions = __op.get('conditions', []),
                 unless = __op.get('unless', []),
                 before = __before,
@@ -97,16 +96,15 @@ class StateHandler(object):
 
     def __execute_transitions(self):
         self.logger.debug('looking for current state for node %s', self._node.to_dict())
-        for __state in self.__operations.keys():
-            if __state == self._node.get_state():
-                self.logger.debug('state %s matched. proceeding.', __state)
-                for __op in self.__operations.get(__state):
-                    __op = __op.get('name')
+        for __op, __options in self.__operations.items():
+            for __source in __options.get('sources'):
+                if __source == self._node.get_state():
+                    self.logger.debug('state %s matched. proceeding.', __source)
                     self.logger.debug('pulling trigger %s', __op)
                     func = getattr(self, __op)
                     func()
                     if not self._proceed:
-                        self.logger.debug('transition has been stopped by %s', __op)
+                        self.logger.debug('%s requires to wait for the next event.', __op)
                         return
 
 
