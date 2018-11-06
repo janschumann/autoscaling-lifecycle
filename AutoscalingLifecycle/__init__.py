@@ -102,6 +102,10 @@ class SsmEvent(Event):
         self.__command = command
 
 
+    def is_successful(self) -> bool:
+        return self._event.get('detail').get('status') != 'Success'
+
+
     def get_lifecycle_action_token(self) -> str:
         return self.__command.get('LifecycleActionToken')
 

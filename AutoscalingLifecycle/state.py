@@ -22,6 +22,7 @@ class StateHandler(object):
     __operations = { }
     _proceed = True
     _node = None
+    state = 'new'
 
 
     def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: LoggerFactory):
@@ -39,27 +40,8 @@ class StateHandler(object):
         self.__execute_transitions()
 
 
-    def __execute_transitions(self):
-        self.logger.debug('looking for current state for node %s', self._node.to_dict())
-        for __state in self.__operations.keys():
-            if __state == self._node.get_state():
-                self.logger.debug('state %s matched. proceeding.', __state)
-                for __op in self.__operations.get(__state):
-                    __op = __op.get('name')
-                    self.logger.debug('pulling trigger %s', __op)
-                    func = getattr(self, __op)
-                    func()
-                    if not self._proceed:
-                        self.logger.debug('transition has been stopped by %s', __op)
-                        return
-
-
-    def _get_transitions(self):
-        raise NotImplementedError()
-
-
     def __initialize_machine(self):
-        self.machine.initial = self._node.get_state()
+        self.state = self._node.get_state()
 
         __transitions = []
         if self._event.is_launching():
@@ -111,6 +93,25 @@ class StateHandler(object):
                 after = __after,
                 prepare = __op.get('prepare', [])
             )
+
+
+    def __execute_transitions(self):
+        self.logger.debug('looking for current state for node %s', self._node.to_dict())
+        for __state in self.__operations.keys():
+            if __state == self._node.get_state():
+                self.logger.debug('state %s matched. proceeding.', __state)
+                for __op in self.__operations.get(__state):
+                    __op = __op.get('name')
+                    self.logger.debug('pulling trigger %s', __op)
+                    func = getattr(self, __op)
+                    func()
+                    if not self._proceed:
+                        self.logger.debug('transition has been stopped by %s', __op)
+                        return
+
+
+    def _get_transitions(self):
+        raise NotImplementedError()
 
 
     def __log_transition(self, direction: str, event_data: EventData):
