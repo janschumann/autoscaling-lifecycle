@@ -4,7 +4,8 @@ from boltons.tbutils import ExceptionInfo
 from botocore.client import BaseClient as BotoClient
 
 from . import CustomWaiters
-from . import MessageFormatter
+from .logging import LoggerFactory
+from .logging import MessageFormatter
 
 
 class BaseClient(object):
@@ -25,11 +26,11 @@ class BaseClient(object):
     formater = None
 
 
-    def __init__(self, client: BotoClient, waiters: CustomWaiters, logger: Logger):
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: LoggerFactory):
         self.client = client
         self.waiters = waiters,
-        self.logger = logger
-        self.formatter = MessageFormatter(logger.name)
+        self.logger = logging.get_logger()
+        self.formatter = logging.get_formatter()
 
 
 class AutoscalingClient(BaseClient):
@@ -126,8 +127,8 @@ class DynamoDbClient(BaseClient):
     """
 
 
-    def __init__(self, client: BotoClient, waiters: CustomWaiters, logger: Logger, state_table):
-        super().__init__(client, waiters, logger)
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: LoggerFactory, state_table):
+        super().__init__(client, waiters, logging)
         self.state_table = state_table
 
 
@@ -377,9 +378,9 @@ class Route53Client(BaseClient):
 
 class SnsClient(BaseClient):
 
-    def __init__(self, client: BotoClient, waiters: CustomWaiters, logger: Logger,
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: LoggerFactory,
                  client_eu_west: BotoClient, topic_arn, account, env):
-        super().__init__(client, waiters, logger)
+        super().__init__(client, waiters, logging)
         self.client_eu_west = client_eu_west
         self.topic_arn = topic_arn
         self.account = account

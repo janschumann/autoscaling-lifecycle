@@ -2,11 +2,15 @@ import json
 import logging
 
 from transitions import EventData
+from boto3 import Session
 
+from AutoscalingLifecycle import ClientFactory
+from AutoscalingLifecycle import CustomWaiters
 from AutoscalingLifecycle import AutoscalingEvent
 from AutoscalingLifecycle import Node
 from AutoscalingLifecycle import SsmEvent
-from AutoscalingLifecycle.logging import Formatter
+from AutoscalingLifecycle.logging import LoggerFactory
+from AutoscalingLifecycle.handlers import SnsHandler
 from AutoscalingLifecycle.state import StateHandler
 
 
@@ -196,13 +200,16 @@ node_repository = NodeRepository()
 message = json.load(open('autoscaling_event.json', 'r'))
 # message = json.load(open('ssm_event.json', 'r'))
 
-l = logging.getLogger('DOCKER-SWARM::BACKEND::QA')
-l.setLevel(logging.INFO)
+f = LoggerFactory('DOCKER-SWARM::BACKEND::QA', logging.DEBUG)
+f.add_handler(logging.StreamHandler(), '%(asctime)s - %(levelname)s - %(message)s')
 
-ch = logging.StreamHandler()
-formatter = Formatter('%(asctime)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-l.addHandler(ch)
+client_factory = ClientFactory(Session(profile_name='7nxt-backend-qa'), f.get_logger())
+waiters = CustomWaiters(client_factory, f.get_logger())
+
+h = SnsHandler(client_factory.get('sns', 'eu-west-1'), "arn:aws:sns:eu-west-1:676446623848:autoscaling")
+f.add_handler(h, '%(message)s')
+
+l = f.get_logger()
 
 l.info('message %s', message)
 
@@ -222,6 +229,6 @@ elif message.get('source') == 'aws.ssm':
     }
     e = SsmEvent(message, command)
 
-h = Docker(e, { }, { 'node': node_repository }, l)
+h = Docker(e, { }, { 'node': node_repository }, f)
 h()
 # h.machine.get_graph(show_roi=True).draw('my_state_diagram.png', prog='dot')

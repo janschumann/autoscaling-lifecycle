@@ -1,12 +1,10 @@
-from logging import Logger
-
 from transitions import EventData
 from transitions import Machine
 from transitions import State
 
 from . import Event
 from . import Node
-from . import MessageFormatter
+from .logging import LoggerFactory
 
 
 class StateHandler(object):
@@ -26,13 +24,13 @@ class StateHandler(object):
     _node = None
 
 
-    def __init__(self, event: Event, clients: dict, repositories: dict, logger: Logger):
+    def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: LoggerFactory):
         self.machine = Machine(self, send_event = True, initial = 'new')
         self._event = event
-        self.logger = logger
+        self.logger = logging_factory.get_logger()
         self.repositories = repositories
         self.clients = clients
-        self.formatter = MessageFormatter(logger.name)
+        self.formatter = logging_factory.get_formatter()
 
 
     def __call__(self):
