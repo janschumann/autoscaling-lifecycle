@@ -6,8 +6,8 @@ import botocore.waiter
 from boto3 import Session
 
 from .logging import Formatter
-from .formatter import MessageFormatter
-from .handlers import SnsHandler
+from .logging import MessageFormatter
+from .logging import SnsHandler
 
 
 class Event(object):

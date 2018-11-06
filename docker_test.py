@@ -10,7 +10,7 @@ from AutoscalingLifecycle import AutoscalingEvent
 from AutoscalingLifecycle import Node
 from AutoscalingLifecycle import SsmEvent
 from AutoscalingLifecycle.logging import LoggerFactory
-from AutoscalingLifecycle.handlers import SnsHandler
+from AutoscalingLifecycle.logging import SnsHandler
 from AutoscalingLifecycle.state import StateHandler
 
 

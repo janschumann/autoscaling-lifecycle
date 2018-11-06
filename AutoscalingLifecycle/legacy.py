@@ -6,14 +6,14 @@ from logging import Logger
 from boto3 import Session
 
 from . import ClientFactory
-from . import MessageFormatter
-from . import Node
 from . import CustomWaiters
+from . import Node
 from .clients import AutoscalingClient
 from .clients import DynamoDbClient
 from .clients import Route53Client
 from .clients import SnsClient
 from .clients import SsmClient
+from .logging import LoggerFactory
 from .repository import CommandRepository
 from .repository import NodeRepository
 
@@ -28,7 +28,7 @@ class EventAction(object):
     - call ssm scripts
 
 
-    :type logger: LifecycleLogger
+    :type logger: Logger
     :param logger: A logger instance
     :type event: dict
     :param event: The event to care about
@@ -56,7 +56,8 @@ class EventAction(object):
     node = None
 
 
-    def __init__(self, name: str, event: dict, session: Session, logger: Logger, notification_arn, account, env):
+    def __init__(self, name: str, event: dict, session: Session, logger_factory: LoggerFactory, notification_arn,
+                 account, env):
         """
         Create a new action
 
@@ -123,9 +124,9 @@ class EventAction(object):
         :param logger: A logger instance
         """
 
-        self.logger = logger
-        self.formatter = MessageFormatter(logger.name)
-        self.__create_clients(name, session, notification_arn, account, env)
+        self.logger = logger_factory.get_logger()
+        self.formatter = logger_factory.get_formatter()
+        self.__create_clients(name, session, logger_factory, notification_arn, account, env)
         self._populate_event_data(event)
 
 
@@ -194,25 +195,26 @@ class EventAction(object):
                                            comment, repr(e))
 
 
-    def __create_clients(self, name: str, session: Session, notification_arn, account, env):
+    def __create_clients(self, name: str, session: Session, logger_factory: LoggerFactory, notification_arn, account,
+                         env):
         self.logger.debug('Creating clients ...')
         client_factory = ClientFactory(session = session, logger = self.logger)
         waiters = CustomWaiters(clients = client_factory, logger = self.logger)
         self.dynamodb_client = DynamoDbClient(
             client = client_factory.get('dynamodb'),
             state_table = name.lower() + '-state',
-            logger = self.logger,
+            logging = logger_factory,
             waiters = waiters
         )
         self.node_repository = NodeRepository(self.dynamodb_client, self.logger)
         self.command_repository = CommandRepository(self.dynamodb_client, self.logger)
-        self.ssm_client = SsmClient(client_factory.get('ssm'), waiters, self.logger)
-        self.autoscaling_client = AutoscalingClient(client_factory.get('autoscaling'), waiters, self.logger)
-        self.route53_client = Route53Client(client_factory.get('route53'), waiters, self.logger)
+        self.ssm_client = SsmClient(client_factory.get('ssm'), waiters, logger_factory)
+        self.autoscaling_client = AutoscalingClient(client_factory.get('autoscaling'), waiters, logger_factory)
+        self.route53_client = Route53Client(client_factory.get('route53'), waiters, logger_factory)
         self.sns = SnsClient(
             client_factory.get('sns'),
             waiters,
-            self.logger,
+            logger_factory,
             client_factory.get('sns', 'eu-west-1'),
             notification_arn,
             account,
