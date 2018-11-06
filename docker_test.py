@@ -3,11 +3,11 @@ import logging
 
 from transitions import EventData
 
-from AutoscalingLifecycle.event import AutoscalingEvent
-from AutoscalingLifecycle.event import SsmEvent
+from AutoscalingLifecycle import AutoscalingEvent
+from AutoscalingLifecycle import Node
+from AutoscalingLifecycle import SsmEvent
+from AutoscalingLifecycle.logging import Formatter
 from AutoscalingLifecycle.state import StateHandler
-from AutoscalingLifecycle.entity.node import Node
-from AutoscalingLifecycle.helper.logger import LifecycleLogger
 
 
 class Docker(StateHandler):
@@ -112,51 +112,51 @@ class Docker(StateHandler):
 
 
     def is_manager(self, event_data: EventData):
-        return event_data.args[0].get_type() == 'manager'
+        return self._node.get_type() == 'manager'
 
 
     def is_worker(self, event_data: EventData):
-        return event_data.args[0].get_type() == 'worker'
+        return self._node.get_type() == 'worker'
 
 
     def do_add_labels(self, event_data: EventData):
-        self.logger.info('adding labels on node %s', event_data.args[0].to_dict())
+        self.logger.info('adding labels on node %s', self._node.to_dict())
 
 
     def do_complete(self, event_data: EventData):
-        self.logger.info('completing autoscaling action for node %s', event_data.args[0].to_dict())
+        self.logger.info('completing autoscaling action for node %s', self._node.to_dict())
 
 
     def do_rebalance_services(self, event_data: EventData):
         self.logger.info('rebalancing services due to autoscaling action in on node %s',
-                         event_data.args[0].to_dict())
+                         self._node.to_dict())
 
 
     def do_update_swarm_dns(self, event_data: EventData):
-        self.logger.info('updating dns on node %s', event_data.args[0].to_dict())
+        self.logger.info('updating dns on node %s', self._node.to_dict())
 
 
     def do_remove(self, event_data: EventData):
-        self.logger.info('removing node %s from db', event_data.args[0].to_dict())
+        self.logger.info('removing node %s from db', self._node.to_dict())
 
 
     def do_remove_from_cluster(self, event_data: EventData):
-        self.logger.info('removing node %s from cluster', event_data.args[0].to_dict())
+        self.logger.info('removing node %s from cluster', self._node.to_dict())
 
 
     def do_register(self, event_data: EventData):
-        self.logger.info('registering node %s', event_data.args[0].to_dict())
+        self.logger.info('registering node %s', self._node.to_dict())
 
 
     def do_join(self, event_data: EventData):
         self.logger.info('waiting for cluster to become ready')
 
-        self.logger.info('joining node %s', event_data.args[0].to_dict())
+        self.logger.info('node %s is joining the cluster', self._node.to_dict())
         self._proceed = False
 
 
     def do_initialize(self, event_data: EventData):
-        self.logger.info('initializing cluster on node %s', event_data.args[0].to_dict())
+        self.logger.info('initializing cluster on node %s', self._node.to_dict())
         self._proceed = False
 
 
@@ -182,20 +182,29 @@ class NodeRepository(object):
         return _node
 
 
+    def update(self, node: Node, changes: dict):
+        parts = []
+        values = { }
+        for k, v in changes.items():
+            node.set_property(k, v)
+            parts.append(' ' + k + ' = :' + k)
+            values.update({ ':' + k: node.get_property(k) })
+
+
 node_repository = NodeRepository()
 
 message = json.load(open('autoscaling_event.json', 'r'))
 # message = json.load(open('ssm_event.json', 'r'))
 
-l = logging.getLogger('docker')
-l.setLevel(logging.DEBUG)
+l = logging.getLogger('DOCKER-SWARM::BACKEND::QA')
+l.setLevel(logging.INFO)
+
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = Formatter('%(asctime)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 l.addHandler(ch)
-logger = LifecycleLogger('DOCKER-SWARM::BACKEND::QA', l)
-logger.info('message %s', message)
+
+l.info('message %s', message)
 
 e = None
 if message.get('source') == 'aws.autoscaling':
@@ -213,5 +222,6 @@ elif message.get('source') == 'aws.ssm':
     }
     e = SsmEvent(message, command)
 
-h = Docker(e, { }, { 'node': node_repository }, logger)
+h = Docker(e, { }, { 'node': node_repository }, l)
 h()
+# h.machine.get_graph(show_roi=True).draw('my_state_diagram.png', prog='dot')

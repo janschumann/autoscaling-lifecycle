@@ -1,12 +1,31 @@
-from AutoscalingLifecycle.client.dynamodb import DynamoDbClient
+from logging import Logger
 
-from AutoscalingLifecycle.entity.node import Node
-from AutoscalingLifecycle.helper.logger import LifecycleLogger
+from . import Node
+from .clients import DynamoDbClient
+
+
+class CommandRepository(object):
+
+    def __init__(self, client: DynamoDbClient, logger: Logger):
+        self.client = client
+        self.logger = logger
+
+
+    def register(self, id: str, data: dict):
+        self.client.put_item(id, 'command', data)
+
+
+    def get(self, id: str):
+        return self.client.get_item(id)
+
+
+    def delete(self, id: str):
+        self.client.delete_item(id)
 
 
 class NodeRepository(object):
 
-    def __init__(self, client: DynamoDbClient, logger: LifecycleLogger):
+    def __init__(self, client: DynamoDbClient, logger: Logger):
         self.client = client
         self.logger = logger
 
@@ -24,9 +43,10 @@ class NodeRepository(object):
     def put(self, node):
         self.client.put_item(node.id, node.type, node.data)
 
+
     def get(self, id: str):
         item = self.client.get_item(id)
-        if item == {}:
+        if item == { }:
             node = Node(id, 'unknown')
         else:
             node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
