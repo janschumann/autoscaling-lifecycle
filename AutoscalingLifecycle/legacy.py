@@ -211,9 +211,9 @@ class EventAction(object):
         self.route53_client = Route53Client(client_factory.get('route53'), waiters, self.logger)
         self.sns = SnsClient(
             client_factory.get('sns'),
-            client_factory.get('sns', 'eu-west-1'),
             waiters,
             self.logger,
+            client_factory.get('sns', 'eu-west-1'),
             notification_arn,
             account,
             env

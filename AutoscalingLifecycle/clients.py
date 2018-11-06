@@ -126,7 +126,7 @@ class DynamoDbClient(BaseClient):
     """
 
 
-    def __init__(self, client, waiters: CustomWaiters, logger: Logger, state_table):
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logger: Logger, state_table):
         super().__init__(client, waiters, logger)
         self.state_table = state_table
 
@@ -375,18 +375,15 @@ class Route53Client(BaseClient):
         self.reset_dns_change_set()
 
 
-class SnsClient(object):
+class SnsClient(BaseClient):
 
-    def __init__(self, client_eu_central, client_eu_west, waiters: CustomWaiters, logger: Logger, topic_arn, account,
-                 env):
-        self.client_eu_central = client_eu_central
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logger: Logger,
+                 client_eu_west: BotoClient, topic_arn, account, env):
+        super().__init__(client, waiters, logger)
         self.client_eu_west = client_eu_west
-        self.waiters = waiters
-        self.logger = logger
         self.topic_arn = topic_arn
         self.account = account
         self.env = env
-        self.message_formatter = MessageFormatter(logger.name)
 
 
     def publish_autoscaling_activity(self, activity, region = "eu-central-1"):
@@ -394,9 +391,9 @@ class SnsClient(object):
         if activity.get('StatusCode') == 'Successful':
             severity = "SUCCESS"
 
-        subject = self.message_formatter.format("%s : %s in %s", [severity, activity.get('Description'), self.env])
-        result = self.message_formatter.to_str(activity)
-        message = self.message_formatter.to_str({
+        subject = self.formatter.format("%s : %s in %s", [severity, activity.get('Description'), self.env])
+        result = self.formatter.to_str(activity)
+        message = self.formatter.to_str({
             'default': result,
             'sms': subject,
             'email': subject + ":\n\n" + result
@@ -405,8 +402,8 @@ class SnsClient(object):
 
 
     def publish_activity(self, action, instance_id, region = "eu-central-1"):
-        subject = self.message_formatter.format("SUCCESS : Finished %s on %s", [action, instance_id])
-        message = self.message_formatter.to_str({
+        subject = self.formatter.format("SUCCESS : Finished %s on %s", [action, instance_id])
+        message = self.formatter.to_str({
             'default': subject,
             'sms': subject,
             'email': subject
@@ -415,12 +412,12 @@ class SnsClient(object):
 
 
     def publish_error(self, exception, action, region = "eu-central-1"):
-        subject = self.message_formatter.format(
+        subject = self.formatter.format(
             'ERROR : while performing %s in environment %s: %s',
             [action, self.env, repr(exception)]
         )
-        result = self.message_formatter.to_str(ExceptionInfo.from_current().to_dict())
-        message = self.message_formatter.to_str({ 'default': result })
+        result = self.formatter.to_str(ExceptionInfo.from_current().to_dict())
+        message = self.formatter.to_str({ 'default': result })
         self.publish(subject, message, region)
 
 
@@ -429,7 +426,7 @@ class SnsClient(object):
             if region == "eu-west-1":
                 client = self.client_eu_west
             else:
-                client = self.client_eu_central
+                client = self.client
             return client.publish(
                 TargetArn = self.topic_arn,
                 Message = message,
@@ -441,13 +438,7 @@ class SnsClient(object):
             return False
 
 
-class SsmClient(object):
-
-    def __init__(self, client, waiters: CustomWaiters, logger: Logger):
-        self.client = client
-        self.waiters = waiters
-        self.logger = logger
-
+class SsmClient(BaseClient):
 
     def send_command(self, instance_id, comment, commands):
         self.logger.debug('Sending command "%s" to instance %s: %s', comment, instance_id, commands)
