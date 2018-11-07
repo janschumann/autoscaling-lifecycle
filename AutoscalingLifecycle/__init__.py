@@ -1,3 +1,4 @@
+import json
 from logging import Logger
 
 import botocore.client
@@ -76,6 +77,15 @@ class Event(object):
 
 
 class AutoscalingEvent(Event):
+
+    def __init__(self, event: dict):
+        super().__init__(event)
+
+        self._event.get('detail').update({
+            'NotificationMetadata': json.loads(self._event.get('detail').get('NotificationMetadata'))
+        })
+
+
     def get_lifecycle_result(self) -> str:
         return self._ABANDON
 
