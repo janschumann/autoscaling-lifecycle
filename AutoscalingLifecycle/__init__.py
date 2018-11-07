@@ -147,7 +147,7 @@ class SsmEvent(Event):
 
 
     def is_successful(self) -> bool:
-        return self._event.get('detail').get('status') != 'Success'
+        return self._event.get('detail').get('status') == 'Success'
 
 
     def get_command_metadata(self) -> dict:
