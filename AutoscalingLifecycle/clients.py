@@ -258,19 +258,21 @@ class DynamoDbClient(BaseClient):
         """
 
         if type(value) is str:
+            if value is '':
+                return None
             return { 'S': value }
 
         elif type(value) is dict:
-            return { 'M': self.__convert_dict_to_dynamodb_map(value, log) }
+            value = self.__convert_dict_to_dynamodb_map(value, log)
+            if value is { }:
+                return None
+            return { 'M': value }
 
-        else:
-            self.logger.warning(
-                'Cannot convert type %s to a dynamodb equivalent. Value will be empty. Valid types are str, dict. Value: %s',
-                type(value),
-                value
-            )
+        value = repr(value)
+        if value is '':
+            return None
 
-        return { 'S': '' }
+        return { 'S': value }
 
 
     def __convert_dict_to_dynamodb_map(self, data: dict, log = True) -> dict:
@@ -290,7 +292,9 @@ class DynamoDbClient(BaseClient):
 
         dynamodb_map = { }
         for key, value in data.items():
-            dynamodb_map.update({ key: self.__build_dynamodb_value(value, False) })
+            value = self.__build_dynamodb_value(value, False)
+            if value is not None:
+                dynamodb_map.update({ key: value })
 
         if log:
             self.logger.debug('Result: %s', dynamodb_map)
