@@ -40,6 +40,10 @@ class Event(object):
         return self._event.get('source')
 
 
+    def is_successful(self) -> bool:
+        return True
+
+
     def is_launching(self) -> bool:
         """
         :rtype: bool
@@ -57,7 +61,10 @@ class Event(object):
 
 
     def get_lifecycle_result(self) -> str:
-        raise NotImplementedError()
+        if self.is_terminating():
+            return self._CONTINUE
+
+        return self._ABANDON
 
 
     def get_lifecycle_action_token(self) -> str:
@@ -96,10 +103,6 @@ class AutoscalingEvent(Event):
             })
 
 
-    def get_lifecycle_result(self) -> str:
-        return self._ABANDON
-
-
     def get_lifecycle_action_token(self) -> str:
         return self._event.get('detail').get('LifecycleActionToken')
 
@@ -134,7 +137,7 @@ class SsmEvent(Event):
 
 
     def get_lifecycle_result(self) -> str:
-        if self.is_successful():
+        if self.is_terminating() or self.is_successful():
             return self._CONTINUE
 
         return self._ABANDON

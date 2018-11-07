@@ -46,9 +46,8 @@ class StateHandler(object):
 
         elif message.get('source') == 'aws.ssm':
             repo = self.repositories.get('command')
-            command = repo.get(message.get('detail').get('command-id'))
-            self._event = SsmEvent(message, command)
-            repo.delete(command.get('id'))
+            self._event = SsmEvent(message, repo.get(message.get('detail').get('command-id')))
+            repo.delete(message.get('detail').get('command-id'))
 
         else:
             raise self.formatter.get_error(TypeError, 'Unknown event source ' + message.get('source'))
