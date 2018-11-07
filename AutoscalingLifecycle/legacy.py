@@ -13,7 +13,7 @@ from .clients import DynamoDbClient
 from .clients import Route53Client
 from .clients import SnsClient
 from .clients import SsmClient
-from .logging import LoggerFactory
+from .logging import Logging
 from .repository import CommandRepository
 from .repository import NodeRepository
 
@@ -56,7 +56,7 @@ class EventAction(object):
     node = None
 
 
-    def __init__(self, name: str, event: dict, session: Session, logger_factory: LoggerFactory, notification_arn,
+    def __init__(self, name: str, event: dict, session: Session, logging: Logging, notification_arn,
                  account, env):
         """
         Create a new action
@@ -124,9 +124,9 @@ class EventAction(object):
         :param logger: A logger instance
         """
 
-        self.logger = logger_factory.get_logger()
-        self.formatter = logger_factory.get_formatter()
-        self.__create_clients(name, session, logger_factory, notification_arn, account, env)
+        self.logger = logging.get_logger()
+        self.formatter = logging.get_formatter()
+        self.__create_clients(name, session, logging, notification_arn, account, env)
         self._populate_event_data(event)
 
 
@@ -195,7 +195,7 @@ class EventAction(object):
                                            comment, repr(e))
 
 
-    def __create_clients(self, name: str, session: Session, logger_factory: LoggerFactory, notification_arn, account,
+    def __create_clients(self, name: str, session: Session, logger_factory: Logging, notification_arn, account,
                          env):
         self.logger.debug('Creating clients ...')
         client_factory = ClientFactory(session = session, logger = self.logger)

@@ -1,4 +1,3 @@
-import logging
 from logging import Logger
 
 import botocore.client
@@ -13,6 +12,10 @@ from .logging import SnsHandler
 class Event(object):
     __LAUNCHING = 'autoscaling:EC2_INSTANCE_LAUNCHING'
     __TERMINATING = 'autoscaling:EC2_INSTANCE_TERMINATING'
+
+    _CONTINUE = 'CONTINUE'
+    _ABANDON = 'ABANDON'
+
     _event = { }
 
 
@@ -44,6 +47,10 @@ class Event(object):
         return self.get_lifecycle_transition() == self.__TERMINATING
 
 
+    def get_lifecycle_result(self) -> str:
+        raise NotImplementedError()
+
+
     def get_lifecycle_action_token(self) -> str:
         raise NotImplementedError()
 
@@ -69,6 +76,10 @@ class Event(object):
 
 
 class AutoscalingEvent(Event):
+    def get_lifecycle_result(self) -> str:
+        return self._ABANDON
+
+
     def get_lifecycle_action_token(self) -> str:
         return self._event.get('detail').get('LifecycleActionToken')
 
@@ -100,6 +111,13 @@ class SsmEvent(Event):
     def __init__(self, event: dict, command: dict):
         super().__init__(event)
         self.__command = command
+
+
+    def get_lifecycle_result(self) -> str:
+        if self.is_successful():
+            return self._CONTINUE
+
+        return self._ABANDON
 
 
     def is_successful(self) -> bool:
@@ -218,11 +236,11 @@ class Node(object):
         self.set_status(dest)
 
 
-    def get_state(self):
+    def get_state(self) -> str:
         return self.status
 
 
-    def is_new(self):
+    def is_new(self) -> bool:
         return self.status == 'new'
 
 
@@ -374,10 +392,6 @@ class CustomWaiters(object):
         self.clients = clients
         self.logger = logger
         self.message_formatter = MessageFormatter(logger.name)
-
-
-    def foo_bar_baz(self):
-        return 'foo'
 
 
     def get_waiter_names(self):

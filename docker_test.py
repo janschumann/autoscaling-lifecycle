@@ -9,7 +9,7 @@ from AutoscalingLifecycle import CustomWaiters
 from AutoscalingLifecycle import AutoscalingEvent
 from AutoscalingLifecycle import Node
 from AutoscalingLifecycle import SsmEvent
-from AutoscalingLifecycle.logging import LoggerFactory
+from AutoscalingLifecycle.logging import Logging
 from AutoscalingLifecycle.logging import SnsHandler
 from AutoscalingLifecycle.state import StateHandler
 
@@ -212,7 +212,7 @@ node_repository = NodeRepository()
 #message = json.load(open('autoscaling_event.json', 'r'))
 message = json.load(open('ssm_event.json', 'r'))
 
-f = LoggerFactory('DOCKER-SWARM::BACKEND::QA', logging.DEBUG)
+f = Logging('DOCKER-SWARM::BACKEND::QA', logging.DEBUG)
 f.add_handler(logging.StreamHandler(), '%(asctime)s - %(levelname)s - %(message)s')
 
 client_factory = ClientFactory(Session(profile_name='7nxt-backend-qa'), f.get_logger())

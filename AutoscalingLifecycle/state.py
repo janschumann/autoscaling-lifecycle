@@ -1,10 +1,9 @@
 from transitions import EventData
 from transitions import Machine
-from transitions import State
 
 from . import Event
 from . import Node
-from .logging import LoggerFactory
+from .logging import Logging
 
 
 class StateHandler(object):
@@ -17,6 +16,8 @@ class StateHandler(object):
     :type _proceed: bool
     :param _node: The node that triggered the event
     :type _node: Node
+    :param state: The current state
+    :type state: str
     """
     __states = { }
     __operations = { }
@@ -25,7 +26,7 @@ class StateHandler(object):
     state = 'new'
 
 
-    def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: LoggerFactory):
+    def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: Logging):
         self.machine = Machine(self, send_event = True, initial = 'new')
         self._event = event
         self.logger = logging_factory.get_logger()
@@ -69,18 +70,20 @@ class StateHandler(object):
             sources = [sources]
 
         for __op in operations:
-            self.__operations.update({__op.get('name'): {
-                'sources': sources
-            }})
+            self.__operations.update({
+                __op.get('name'): {
+                    'sources': sources
+                }
+            })
 
-        self.machine.add_state(dest)
         self.machine.add_state(sources)
+        self.machine.add_state(dest)
 
         for __op in operations:
             # first log the event, than do the action
             __before = [self.__log_before] + __op.get('before', [])
             # first update the node, than do the action and log the event
-            __after = [self.__update_node] +  __op.get('after', []) + [self.__log_after]
+            __after = [self.__update_node] + __op.get('after', []) + [self.__log_after]
 
             self.machine.add_transition(
                 __op.get('name'),

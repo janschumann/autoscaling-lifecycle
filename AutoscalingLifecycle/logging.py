@@ -75,7 +75,7 @@ class MessageFormatter(object):
         return error_type(self.format(message, args))
 
 
-class LoggerFactory(object):
+class Logging(object):
 
     def __init__(self, name, level):
         self.formatter = MessageFormatter(name)
