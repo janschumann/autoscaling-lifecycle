@@ -293,7 +293,7 @@ class DynamoDbClient(BaseClient):
         dynamodb_map = { }
         for key, value in data.items():
             value = self.__build_dynamodb_value(value, False)
-            if value is None:
+            if value is not None:
                 dynamodb_map.update({ key: value })
 
         if log:
