@@ -68,20 +68,31 @@ class StateHandler(object):
         self.logger.debug('machine initialized with %s', self.__operations)
 
 
-    def __call__(self):
+    def __call__(self, raise_on_error: bool = False):
         if self._event is None or self._node is None:
             self.logger.error('Machine is not initialized')
 
         self.logger.info('execute transitions for %s', self._node.to_dict())
-        for __op, __options in self.__operations.items():
-            for __source in __options.get('sources'):
-                if __source == self._node.get_state():
-                    self.logger.debug('state %s matched. pulling trigger %s', __source, __op)
-                    func = getattr(self, __op)
-                    func()
-                    if self._wait_for_next_event:
-                        self.logger.debug('%s requires to wait for the next event.', __op)
-                        return
+        try:
+            for __op, __options in self.__operations.items():
+                for __source in __options.get('sources'):
+                    if __source == self._node.get_state():
+                        self.logger.debug('state %s matched. pulling trigger %s', __source, __op)
+                        func = getattr(self, __op)
+                        func()
+                        if self._wait_for_next_event:
+                            self.logger.debug('%s requires to wait for the next event.', __op)
+                            return
+        except Exception as e:
+            self.logger.exception("An error occured during transition. %s. Setting state to failure.", repr(e))
+            self.repositories.get('node').update(self._node, {
+                'ItemStatus': 'failure'
+            })
+            if raise_on_error:
+                raise
+
+            # try graceful completion and raise on error
+            self(True)
 
 
     def __initialize_machine(self):
