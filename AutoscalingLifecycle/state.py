@@ -70,19 +70,22 @@ class StateHandler(object):
 
     def __call__(self, raise_on_error: bool = False):
         if self._event is None or self._node is None:
-            self.logger.error('Machine is not initialized')
+            self.logger.error('Machine is not initialized. Please call prepare_machine() before.')
+            return
 
-        self.logger.info('execute transitions for %s', self._node.to_dict())
+        self.logger.info('find trigger for %s', self._node.to_dict())
         try:
             for __op, __options in self.__operations.items():
                 for __source in __options.get('sources'):
                     if __source == self._node.get_state():
-                        self.logger.debug('state %s matched. pulling trigger %s', __source, __op)
+                        self.logger.info('state %s matched. pulling trigger %s', __source, __op)
                         func = getattr(self, __op)
                         func()
+                        self.logger.info('trigger %s complete', __op)
                         if self._wait_for_next_event:
-                            self.logger.debug('%s requires to wait for the next event.', __op)
+                            self.logger.info('%s requires to wait for the next event.', __op)
                             return
+
         except Exception as e:
             self.logger.exception("An error occured during transition. %s. Setting state to failure.", repr(e))
             self.repositories.get('node').update(self._node, {
