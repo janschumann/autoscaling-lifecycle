@@ -213,7 +213,7 @@ node_repository = NodeRepository()
 message = json.load(open('ssm_event.json', 'r'))
 
 f = Logging('DOCKER-SWARM::BACKEND::QA', logging.DEBUG)
-f.add_handler(logging.StreamHandler(), '%(asctime)s - %(levelname)s - %(message)s')
+f.add_handler(logging.StreamHandler(), "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
 
 client_factory = ClientFactory(Session(profile_name='7nxt-backend-qa'), f.get_logger())
 waiters = CustomWaiters(client_factory, f.get_logger())

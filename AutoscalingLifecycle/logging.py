@@ -12,20 +12,18 @@ class MessageFormatter(object):
 
 
     def format(self, message: str, args) -> str:
-        return ('%s: ' + message) % self.format_args(self.name, args)
+        return ('%s: ' + message) % (tuple(self.name) + self.format_args(args))
 
 
-    def format_args(self, name, args) -> tuple:
+    def format_args(self, args) -> tuple:
         if not args or len(args) == 0:
-            return tuple([name])
+            return tuple()
 
         if type(args) is not tuple and type(args) is not list:
             args = [args]
 
         if type(args) is tuple:
             args = list(args)
-
-        args = [name] + args
 
         formatted_args = []
         for arg in args:
@@ -79,7 +77,14 @@ class Logging(object):
 
     def __init__(self, name, level):
         self.formatter = MessageFormatter(name)
+        self.logger = logging.getLogger()
+        # remove handlers from root logger
+        for h in self.logger.handlers:
+            self.logger.removeHandler(h)
         self.logger = logging.getLogger(name)
+        # remove handlers from our logger
+        for h in self.logger.handlers:
+            self.logger.removeHandler(h)
         self.logger.setLevel(level)
 
 
@@ -115,18 +120,9 @@ class Formatter(logging.Formatter):
         if self.formatter is None:
             raise RuntimeError("No formatter is set")
 
-        original_msg = record.msg
-        original_args = record.args
+        record.args = self.formatter.format_args(record.args)
 
-        record.msg = '%s: ' + record.msg
-        record.args = self.formatter.format_args(record.name, record.args)
-
-        s = super().format(record)
-
-        record.msg = original_msg
-        record.args = original_args
-
-        return s
+        return super().format(record)
 
 
 class SnsHandler(logging.Handler):
