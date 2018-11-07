@@ -40,7 +40,7 @@ class StateHandler(object):
         self.formatter = logging_factory.get_formatter()
 
 
-    def initialize(self, message: dict):
+    def prepare_machine(self, message: dict):
         if message.get('source') == 'aws.autoscaling':
             self._event = AutoscalingEvent(message)
 
