@@ -43,6 +43,7 @@ class StateHandler(object):
 
         self.logger.debug('initializing the machine')
         self.__initialize_machine()
+        self.logger.debug('machine initialized with %s', self.__operations)
 
         self.logger.debug('execute transitions for %s', self._node.to_dict())
         self.__execute_transitions()
