@@ -36,7 +36,10 @@ class StateHandler(object):
 
 
     def __call__(self):
+        self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
+        self.logger.debug('node is %s', self._node)
+
         self.__initialize_machine()
         self.__execute_transitions()
 
