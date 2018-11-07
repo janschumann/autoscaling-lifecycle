@@ -18,7 +18,11 @@ class Repositories(object):
 
 
     def get(self, name):
-        return self.__repositoroes.get('name', None)
+        repository = self.__repositoroes.get(name, None)
+        if repository is None:
+            raise RuntimeError("No repository %s", name)
+
+        return repository
 
 
 class CommandRepository(object):

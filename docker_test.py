@@ -13,6 +13,15 @@ from AutoscalingLifecycle import SsmEvent
 from AutoscalingLifecycle.logging import Logging
 from AutoscalingLifecycle.logging import SnsHandler
 from AutoscalingLifecycle.state import StateHandler
+from AutoscalingLifecycle.clients import Clients
+from AutoscalingLifecycle.clients import DynamoDbClient
+from AutoscalingLifecycle.clients import AutoscalingClient
+from AutoscalingLifecycle.clients import SnsClient
+from AutoscalingLifecycle.clients import SsmClient
+from AutoscalingLifecycle.clients import Route53Client
+
+from AutoscalingLifecycle.repository import Repositories
+from AutoscalingLifecycle.repository import CommandRepository
 
 
 class Docker(StateHandler):
