@@ -141,27 +141,27 @@ class SsmEvent(Event):
 
 
     def get_lifecycle_action_token(self) -> str:
-        return self.__command.get('LifecycleActionToken')
+        return self.__command.get('detail').get('LifecycleActionToken')
 
 
     def get_lifecycle_transition(self) -> str:
-        return self.__command.get('LifecycleTransition')
+        return self.__command.get('detail').get('LifecycleTransition')
 
 
     def get_lifecycle_hook_name(self) -> str:
-        return self.__command.get('LifecycleHookName')
+        return self.__command.get('detail').get('LifecycleHookName')
 
 
     def get_autoscaling_group_name(self) -> str:
-        return self.__command.get('AutoScalingGroupName')
+        return self.__command.get('detail').get('AutoScalingGroupName')
 
 
     def get_instance_id(self) -> str:
-        return self.__command.get('EC2InstanceId')
+        return self.__command.get('detail').get('EC2InstanceId')
 
 
     def get_metadata(self) -> dict:
-        return self.__command.get('NotificationMetadata')
+        return self.__command.get('detail').get('NotificationMetadata')
 
 
 class Node(object):
