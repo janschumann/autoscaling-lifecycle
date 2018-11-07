@@ -36,7 +36,7 @@ class StateHandler(object):
 
 
     def __call__(self):
-        self.logger.debug('processing event %s', self._event.get_event())
+        self.logger.debug('processing %s event: %s', self._event.get_source(), self._event.get_detail())
         self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
         self.logger.debug('node is %s', self._node.to_dict())
