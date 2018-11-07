@@ -81,8 +81,8 @@ class StateHandler(object):
 
 
     def __initialize_machine(self):
-        self.state = self._node.get_state()
-        self.machine = Machine(self, send_event = True, initial = 'new')
+        self.machine = Machine(self, send_event = True, initial = self._node.get_state())
+        self.state = self.machine.initial
 
         __transitions = []
         if self._event.is_launching():
