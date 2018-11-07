@@ -43,8 +43,8 @@ class MessageFormatter(object):
         return json.dumps(
             data,
             sort_keys = True,
-            indent = 4,
-            ensure_ascii = False,
+            indent = None,
+            ensure_ascii = True,
             default = self.__json_convert
         )
 

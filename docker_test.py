@@ -194,7 +194,7 @@ class NodeRepository(object):
         if id in self.nodes.keys():
             return self.nodes.get(id)
 
-        _node = Node(id, 'worker')
+        _node = Node(id, 'manager')
         return _node
 
 
@@ -209,13 +209,13 @@ class NodeRepository(object):
 
 node_repository = NodeRepository()
 
-#message = json.load(open('autoscaling_event.json', 'r'))
-message = json.load(open('ssm_event.json', 'r'))
+message = json.load(open('autoscaling_event.json', 'r'))
+#message = json.load(open('ssm_event.json', 'r'))
 
 f = Logging('DOCKER-SWARM::BACKEND::QA', logging.DEBUG)
 f.add_handler(logging.StreamHandler(), "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
 
-client_factory = ClientFactory(Session(profile_name='7nxt-backend-qa'), f.get_logger())
+client_factory = ClientFactory(Session(profile_name='7nxt-tooling-live'), f.get_logger())
 waiters = CustomWaiters(client_factory, f.get_logger())
 
 #h = SnsHandler(client_factory.get('sns', 'eu-west-1'), "arn:aws:sns:eu-west-1:676446623848:autoscaling")

@@ -1,22 +1,29 @@
 {
   "version": "0",
-  "id": "6a7e8feb-b491-4cf7-a9f1-bf3703467718",
+  "id": "188a0c14-1315-3afd-3ee8-6e83e3f7618f",
   "detail-type": "EC2 Instance-launch Lifecycle Action",
   "source": "aws.autoscaling",
-  "account": "123456789012",
-  "time": "2015-12-22T18:43:48Z",
+  "account": "390028087082",
+  "time": "2018-11-07T08:04:05Z",
   "region": "eu-central-1",
   "resources": [
-    "arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:59fcbb81-bd02-485d-80ce-563ef5b237bf:autoScalingGroupName/sampleASG"
+    "arn:aws:autoscaling:eu-central-1:390028087082:autoScalingGroup:ac97bd5b-c95f-4027-adb0-eec3b99987e2:autoScalingGroupName/docker-swarm-manager-live"
   ],
   "detail": {
-    "LifecycleActionToken": "c613620e-07e2-4ed2-a9e2-ef8258911ade",
-    "AutoScalingGroupName": "sampleASG",
-    "LifecycleHookName": "SampleLifecycleHook-12345",
-    "EC2InstanceId": "existing_node",
+    "LifecycleActionToken": "870f2877-8bde-4512-945d-43c3736d1f71",
+    "AutoScalingGroupName": "docker-swarm-manager-live",
+    "LifecycleHookName": "docker-swarm-manager-live-on-launch",
+    "EC2InstanceId": "i-025b4ea5a62c020b7",
     "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
     "NotificationMetadata": {
-      "type": "manager"
+      "type": "manager",
+      "name": "docker-swarm",
+      "account": "tooling",
+      "environment": "live",
+      "managerZoneId": "Z16LNJ5269K3PA",
+      "managerDnsName": "docker-manager.tooling.live.7nxt.internal",
+      "managerDnsTtl": "60",
+      "debug": "false"
     }
   }
 }
