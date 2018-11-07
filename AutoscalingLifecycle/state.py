@@ -53,6 +53,8 @@ class StateHandler(object):
         else:
             raise self.formatter.get_error(TypeError, 'Unknown event source ' + message.get('source'))
 
+        self.logger.info('processing %s event: %s', repr(self._event), self._event.get_event())
+
         self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
         self.logger.debug('node is %s', self._node.to_dict())
@@ -66,13 +68,11 @@ class StateHandler(object):
         if self._event is None or self._node is None:
             self.logger.error('Machine is not initialized')
 
-        self.logger.info('processing event: %s', self._event.get_event())
         self.logger.info('execute transitions for %s', self._node.to_dict())
         for __op, __options in self.__operations.items():
             for __source in __options.get('sources'):
                 if __source == self._node.get_state():
-                    self.logger.debug('node state %s matched %s. proceeding.', self._node.get_state(), __source)
-                    self.logger.debug('pulling trigger %s', __op)
+                    self.logger.debug('state %s matched. pulling trigger %s', __source, __op)
                     func = getattr(self, __op)
                     func()
                     if self._wait_for_next_event:
