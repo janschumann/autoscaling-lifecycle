@@ -57,6 +57,11 @@ class StateHandler(object):
         self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
         self.logger.debug('node is %s', self._node.to_dict())
+        if not self._event.is_successful():
+            self.logger.error("Event not successful. Setting state to failure.")
+            self.repositories.get('node').update(self._node, {
+                'ItemStatus': 'failure'
+            })
 
         self.logger.debug('initializing the machine')
         self.__initialize_machine()
