@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from transitions import EventData
 from boto3 import Session

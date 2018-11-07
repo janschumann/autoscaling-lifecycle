@@ -4,8 +4,46 @@ from boltons.tbutils import ExceptionInfo
 from botocore.client import BaseClient as BotoClient
 
 from . import CustomWaiters
+from . import ClientFactory
 from .logging import Logging
 from .logging import MessageFormatter
+
+
+class Clients(object):
+    """
+    lazy load clients when needed
+    :param __client_specs: A dict of client specifications
+    :type __client_specs: dict
+    :param __clients: A dict of client instances
+    :type __clients: dict
+    """
+    __client_specs = {}
+    __clients = {}
+
+
+    def __init__(self, cfactory: ClientFactory, waiters: CustomWaiters, logging: Logging):
+        self.cfactory = cfactory
+        self.waiters = waiters
+        self.logging = logging
+
+
+    def add_client_spec(self, name, cls, *args):
+        self.__client_specs.update({name: {
+            'class': cls,
+            'args': args
+        }})
+
+
+    def get(self, name):
+        spec = self.__client_specs.get(name, None)
+        if spec is None:
+            raise RuntimeError("no specs for %s found" % name)
+
+        client = self.__clients.get('name', None)
+        if client is None:
+            client = spec.get('class')(self.cfactory.get(name), self.waiters, self.logging, *spec.get('args'))
+
+        return client
 
 
 class BaseClient(object):
@@ -26,7 +64,7 @@ class BaseClient(object):
     formatter = None
 
 
-    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging):
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging, *args):
         self.client = client
         self.waiters = waiters
         self.logger = logging.get_logger()
@@ -127,8 +165,9 @@ class DynamoDbClient(BaseClient):
     """
 
 
-    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging, state_table):
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging, *args):
         super().__init__(client, waiters, logging)
+        state_table, = args
         self.state_table = state_table
 
 
@@ -382,9 +421,9 @@ class Route53Client(BaseClient):
 
 class SnsClient(BaseClient):
 
-    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging,
-                 client_eu_west: BotoClient, topic_arn, account, env):
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging, *args):
         super().__init__(client, waiters, logging)
+        client_eu_west, topic_arn, account, env = args
         self.client_eu_west = client_eu_west
         self.topic_arn = topic_arn
         self.account = account

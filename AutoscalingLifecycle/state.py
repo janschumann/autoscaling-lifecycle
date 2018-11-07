@@ -3,7 +3,11 @@ from transitions import Machine
 
 from . import Event
 from . import Node
+from . import AutoscalingEvent
+from . import SsmEvent
 from .logging import Logging
+from .clients import Clients
+from .repository import Repositories
 
 
 class StateHandler(object):
@@ -12,31 +16,43 @@ class StateHandler(object):
     :type __states: dict
     :param __operations: A dict of operations
     :type __operations: dict
-    :param _proceed: If set to False, the execution will be suspended until the next event occurs
-    :type _proceed: bool
+    :param _wait_for_next_event: If set to true, the execution will be suspended until the next event occurs
+    :type _wait_for_next_event: bool
     :param _node: The node that triggered the event
     :type _node: Node
+    :param _event: The event
+    :type _event: Event
     :param state: The current state
     :type state: str
     """
     __states = { }
     __operations = { }
-    _proceed = True
+    _wait_for_next_event = False
     _node = None
+    _event = None
     state = 'new'
 
 
-    def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: Logging):
-        self.machine = Machine(self, send_event = True, initial = 'new')
+    def __init__(self, clients: Clients, repositories: Repositories, logging_factory: Logging):
         self.logger = logging_factory.get_logger()
-        self._event = event
         self.repositories = repositories
         self.clients = clients
         self.formatter = logging_factory.get_formatter()
 
 
-    def __call__(self):
-        self.logger.debug('processing event: %s', self._event.get_event())
+    def initialize(self, message: dict):
+        if message.get('source') == 'aws.autoscaling':
+            self._event = AutoscalingEvent(message)
+
+        elif message.get('source') == 'aws.ssm':
+            repo = self.repositories.get('command')
+            command = repo.get(message.get('detail').get('command-id'))
+            self._event = SsmEvent(message, command)
+            repo.delete(command.get('id'))
+
+        else:
+            raise self.formatter.get_error(TypeError, 'Unknown event source ' + message.get('source'))
+
         self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
         self.logger.debug('node is %s', self._node.to_dict())
@@ -45,12 +61,28 @@ class StateHandler(object):
         self.__initialize_machine()
         self.logger.debug('machine initialized with %s', self.__operations)
 
-        self.logger.debug('execute transitions for %s', self._node.to_dict())
-        self.__execute_transitions()
+
+    def __call__(self):
+        if self._event is None or self._node is None:
+            self.logger.error('Machine is not initialized')
+
+        self.logger.info('processing event: %s', self._event.get_event())
+        self.logger.info('execute transitions for %s', self._node.to_dict())
+        for __op, __options in self.__operations.items():
+            for __source in __options.get('sources'):
+                if __source == self._node.get_state():
+                    self.logger.debug('node state %s matched %s. proceeding.', self._node.get_state(), __source)
+                    self.logger.debug('pulling trigger %s', __op)
+                    func = getattr(self, __op)
+                    func()
+                    if self._wait_for_next_event:
+                        self.logger.debug('%s requires to wait for the next event.', __op)
+                        return
 
 
     def __initialize_machine(self):
         self.state = self._node.get_state()
+        self.machine = Machine(self, send_event = True, initial = 'new')
 
         __transitions = []
         if self._event.is_launching():
@@ -105,19 +137,6 @@ class StateHandler(object):
             )
 
 
-    def __execute_transitions(self):
-        for __op, __options in self.__operations.items():
-            for __source in __options.get('sources'):
-                if __source == self._node.get_state():
-                    self.logger.debug('node state %s matched %s. proceeding.', self._node.get_state(), __source)
-                    self.logger.debug('pulling trigger %s', __op)
-                    func = getattr(self, __op)
-                    func()
-                    if not self._proceed:
-                        self.logger.debug('%s requires to wait for the next event.', __op)
-                        return
-
-
     def _get_transitions(self):
         raise NotImplementedError()
 
@@ -162,7 +181,7 @@ class StateHandler(object):
         :param commands: A list of commands to execute
         """
 
-        self._proceed = False
+        self._wait_for_next_event = True
 
         metadata = self._event.get_event()
         metadata.update({ 'RunningOn': instance_id })

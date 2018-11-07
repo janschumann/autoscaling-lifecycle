@@ -4,6 +4,23 @@ from . import Node
 from .clients import DynamoDbClient
 
 
+class Repositories(object):
+
+    __repositoroes = {}
+
+    def __init__(self, client: DynamoDbClient, logger: Logger):
+        self.client = client
+        self.logger = logger
+
+
+    def add(self, name, cls):
+        self.__repositoroes.update({name: cls(self.client, self.logger)})
+
+
+    def get(self, name):
+        return self.__repositoroes.get('name', None)
+
+
 class CommandRepository(object):
 
     def __init__(self, client: DynamoDbClient, logger: Logger):
