@@ -24,19 +24,19 @@ class StateHandler(object):
     _proceed = True
     _node = None
     state = 'new'
-    executed_ops = 0
 
 
     def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: Logging):
         self.machine = Machine(self, send_event = True, initial = 'new')
-        self._event = event
         self.logger = logging_factory.get_logger()
+        self._event = event
         self.repositories = repositories
         self.clients = clients
         self.formatter = logging_factory.get_formatter()
 
 
     def __call__(self):
+        self.logger.debug('processing event %s', self._event.get_event())
         self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
         self.logger.debug('node is %s', self._node.to_dict())
@@ -104,14 +104,10 @@ class StateHandler(object):
             )
 
 
-    def __execute_transitions(self, ignore_wildcard_source = True):
+    def __execute_transitions(self):
         for __op, __options in self.__operations.items():
             for __source in __options.get('sources'):
-                if __source == '*' and ignore_wildcard_source:
-                    continue
-
-                if __source == self._node.get_state() or (__source == '*' and not ignore_wildcard_source):
-                    self.executed_ops += 1
+                if __source == self._node.get_state():
                     self.logger.debug('node state %s matched %s. proceeding.', self._node.get_state(), __source)
                     self.logger.debug('pulling trigger %s', __op)
                     func = getattr(self, __op)
@@ -119,11 +115,6 @@ class StateHandler(object):
                     if not self._proceed:
                         self.logger.debug('%s requires to wait for the next event.', __op)
                         return
-
-        if self.executed_ops == 0:
-            self.executed_ops += 1
-            # try again with wildcard sources
-            self.__execute_transitions(False)
 
 
     def _get_transitions(self):

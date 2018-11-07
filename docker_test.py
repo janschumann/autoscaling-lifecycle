@@ -90,7 +90,7 @@ class Docker(StateHandler):
             ],
             'terminating': [
                 {
-                    'source': '*',
+                    'source': ['new', 'pending', 'initializing', 'labeled', 'online', 'ready', 'running'],
                     'dest': 'terminating',
                     'operations': [
                         {

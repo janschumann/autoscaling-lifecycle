@@ -24,6 +24,10 @@ class Event(object):
         self._event = event
 
 
+    def __dict__(self):
+        return self.get_event()
+
+
     def get_event(self) -> dict:
         return self._event
 

@@ -28,7 +28,7 @@ class BaseClient(object):
 
     def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging):
         self.client = client
-        self.waiters = waiters,
+        self.waiters = waiters
         self.logger = logging.get_logger()
         self.formatter = logging.get_formatter()
 
