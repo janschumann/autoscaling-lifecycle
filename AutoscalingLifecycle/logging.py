@@ -12,7 +12,8 @@ class MessageFormatter(object):
 
 
     def format(self, message: str, args) -> str:
-        return ('%s: ' + message) % (tuple(self.name) + self.format_args(args))
+        args = tuple([self.name] + list(self.format_args(args)))
+        return ('%s: ' + message) % args
 
 
     def format_args(self, args) -> tuple:

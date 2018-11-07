@@ -24,6 +24,7 @@ class StateHandler(object):
     _proceed = True
     _node = None
     state = 'new'
+    executed_ops = 0
 
 
     def __init__(self, event: Event, clients: dict, repositories: dict, logging_factory: Logging):
@@ -40,7 +41,10 @@ class StateHandler(object):
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
         self.logger.debug('node is %s', self._node.to_dict())
 
+        self.logger.debug('initializing the machine')
         self.__initialize_machine()
+
+        self.logger.debug('execute transitions for %s', self._node.to_dict())
         self.__execute_transitions()
 
 
@@ -100,18 +104,26 @@ class StateHandler(object):
             )
 
 
-    def __execute_transitions(self):
-        self.logger.debug('looking for current state for node %s', self._node.to_dict())
+    def __execute_transitions(self, ignore_wildcard_source = True):
         for __op, __options in self.__operations.items():
             for __source in __options.get('sources'):
-                if __source == self._node.get_state():
-                    self.logger.debug('state %s matched. proceeding.', __source)
+                if __source == '*' and ignore_wildcard_source:
+                    continue
+
+                if __source == self._node.get_state() or (__source == '*' and not ignore_wildcard_source):
+                    self.executed_ops += 1
+                    self.logger.debug('node state %s matched %s. proceeding.', self._node.get_state(), __source)
                     self.logger.debug('pulling trigger %s', __op)
                     func = getattr(self, __op)
                     func()
                     if not self._proceed:
                         self.logger.debug('%s requires to wait for the next event.', __op)
                         return
+
+        if self.executed_ops == 0:
+            self.executed_ops += 1
+            # try again with wildcard sources
+            self.__execute_transitions(False)
 
 
     def _get_transitions(self):

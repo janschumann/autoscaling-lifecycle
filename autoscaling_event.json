@@ -14,7 +14,7 @@
     "AutoScalingGroupName": "docker-swarm-manager-live",
     "LifecycleHookName": "docker-swarm-manager-live-on-launch",
     "EC2InstanceId": "i-025b4ea5a62c020b7",
-    "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
+    "LifecycleTransition": "autoscaling:EC2_INSTANCE_TERMINATING",
     "NotificationMetadata": {
       "type": "manager",
       "name": "docker-swarm",

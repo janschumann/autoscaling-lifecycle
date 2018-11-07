@@ -195,6 +195,7 @@ class NodeRepository(object):
             return self.nodes.get(id)
 
         _node = Node(id, 'manager')
+        _node.set_state('pending')
         return _node
 
 

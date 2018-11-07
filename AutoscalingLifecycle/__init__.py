@@ -81,9 +81,11 @@ class AutoscalingEvent(Event):
     def __init__(self, event: dict):
         super().__init__(event)
 
-        self._event.get('detail').update({
-            'NotificationMetadata': json.loads(self._event.get('detail').get('NotificationMetadata'))
-        })
+        metadata = self._event.get('detail').get('NotificationMetadata')
+        if type(metadata) is not dict:
+            self._event.get('detail').update({
+                'NotificationMetadata': json.loads(metadata)
+            })
 
 
     def get_lifecycle_result(self) -> str:
