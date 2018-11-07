@@ -24,12 +24,8 @@ class Event(object):
         self._event = event
 
 
-    def __dict__(self):
-        return self.get_event()
-
-
-    def get_event(self) -> dict:
-        return self._event
+    def get_detail(self) -> dict:
+        return self._event.get('detail')
 
 
     def get_source(self) -> str:
@@ -138,6 +134,10 @@ class SsmEvent(Event):
 
     def is_successful(self) -> bool:
         return self._event.get('detail').get('status') != 'Success'
+
+
+    def get_detail(self) -> dict:
+        return self.__command.get('detail')
 
 
     def get_lifecycle_action_token(self) -> str:

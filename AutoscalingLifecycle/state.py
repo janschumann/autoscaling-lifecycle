@@ -163,7 +163,7 @@ class StateHandler(object):
 
         self._proceed = False
 
-        metadata = self._event.get_event()
+        metadata = self._event.get_detail()
         metadata.update({ 'RunningOn': instance_id })
         metadata.update({ 'Comment': comment })
         metadata.update({ 'Commands': ','.join(commands) })
