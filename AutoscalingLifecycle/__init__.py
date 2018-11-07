@@ -28,6 +28,10 @@ class Event(object):
         return self._event
 
 
+    def get_command_metadata(self) -> dict:
+        return self.get_event()
+
+
     def get_detail(self) -> dict:
         return self._event.get('detail')
 
@@ -136,11 +140,17 @@ class SsmEvent(Event):
         return self._ABANDON
 
 
+    def get_event(self):
+        e = super().get_event()
+        e.update({'CommandMetadata': self.get_command_metadata()})
+        return e
+
+
     def is_successful(self) -> bool:
         return self._event.get('detail').get('status') != 'Success'
 
 
-    def get_event(self) -> dict:
+    def get_command_metadata(self) -> dict:
         return self.__command
 
 

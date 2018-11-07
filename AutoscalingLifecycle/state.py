@@ -183,7 +183,7 @@ class StateHandler(object):
 
         self._wait_for_next_event = True
 
-        metadata = self._event.get_event()
+        metadata = self._event.get_command_metadata()
         metadata.update({ 'RunningOn': instance_id })
         metadata.update({ 'Comment': comment })
         metadata.update({ 'Commands': ','.join(commands) })
