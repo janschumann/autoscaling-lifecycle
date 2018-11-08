@@ -64,13 +64,16 @@ class StateHandler(object):
             self.repositories.get('node').update(self._node, {
                 'ItemStatus': 'failure'
             })
+            # @todo is this necessary?
+            self.machine.initial = self._node.get_state()
+            self.state = self.machine.initial
 
         self.logger.debug('initializing the machine')
         self.__initialize_machine()
         self.logger.debug('machine initialized with %s', self.__operations)
 
 
-    def __call__(self, raise_on_error: bool = False):
+    def __call__(self):
         if self._event is None or self._node is None:
             self.logger.error('Machine is not initialized. Please call prepare_machine() before.')
             return
@@ -87,14 +90,14 @@ class StateHandler(object):
                         func = getattr(self, __op)
                         try:
                             func()
-                        except Exception:
+                        except Exception as e:
                             if self._raise_on_operation_failure:
                                 raise
-                            self.logger.warning("Ignoring failure in trigger %s failed. Proceed to next trigger.")
+                            msg = "Ignoring failure %s in trigger %s failed. Proceed to next trigger."
+                            self.logger.exception(msg, repr(e), __op)
 
                         self.logger.info('trigger %s complete', __op)
                         if self._wait_for_next_event:
-                            self.logger.info('%s requires to wait for the next event.', __op)
                             return
 
         except Exception as e:
@@ -102,11 +105,11 @@ class StateHandler(object):
             self.repositories.get('node').update(self._node, {
                 'ItemStatus': 'failure'
             })
-            if raise_on_error:
-                raise
-
-            # try graceful completion and raise on error
-            self(True)
+            # @todo is this necessary?
+            self.machine.initial = self._node.get_state()
+            self.state = self.machine.initial
+            # make sure failure state can be fulfilled
+            self.__allowed_transition_loops +=1
 
         # @todo this should not be necessary: remove this after testing the correct termination criterion has been found
         # no last operation found. try again
@@ -209,7 +212,7 @@ class StateHandler(object):
             self.machine.initial = self._node.get_state()
             self.state = self.machine.initial
         else:
-            self.wait_for_next_event()
+            self.wait_for_next_event(event_data)
 
 
     def _call_ssm_command(self, instance_id: str, comment: str, commands: list):
@@ -226,8 +229,6 @@ class StateHandler(object):
         :type commands: list
         :param commands: A list of commands to execute
         """
-
-        self.wait_for_next_event()
 
         metadata = self._event.get_command_metadata()
         metadata.update({ 'RunningOn': instance_id })
@@ -255,9 +256,11 @@ class StateHandler(object):
         return self._event.is_successful()
 
 
-    def wait_for_next_event(self):
+    def wait_for_next_event(self, event_data: EventData):
+        self.logger.debug("%s requires to wait for the next event.", repr(event_data))
         self._wait_for_next_event = True
 
 
-    def ignore_operation_failure(self):
+    def ignore_operation_failure(self, event_data: EventData):
+        self.logger.debug("%s requires to ignore exceptions.", repr(event_data))
         self._raise_on_operation_failure = False
