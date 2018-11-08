@@ -42,7 +42,7 @@ class StateHandler(object):
         self.formatter = logging_factory.get_formatter()
 
 
-    def prepare_machine(self, message: dict):
+    def prepare_machine(self, message: dict, send_event: bool = True):
         if message.get('source') == 'aws.autoscaling':
             self._event = AutoscalingEvent(message)
 
@@ -55,6 +55,7 @@ class StateHandler(object):
             raise self.formatter.get_error(TypeError, 'Unknown event source ' + message.get('source'))
 
         self.logger.info('processing %s event: %s', repr(self._event), self._event.get_event())
+        self.log_autoscaling_activity()
 
         self.logger.debug('loading node %s', self._event.get_instance_id())
         self._node = self.repositories.get('node').get(self._event.get_instance_id())
@@ -69,7 +70,7 @@ class StateHandler(object):
             self.state = self.machine.initial
 
         self.logger.debug('initializing the machine')
-        self.__initialize_machine()
+        self.__initialize_machine(send_event)
         self.logger.debug('machine initialized with %s', self.__operations)
 
 
@@ -118,8 +119,8 @@ class StateHandler(object):
         self()
 
 
-    def __initialize_machine(self):
-        self.machine = Machine(self, send_event = True, initial = self._node.get_state())
+    def __initialize_machine(self, send_event: bool = True):
+        self.machine = Machine(self, send_event = send_event, initial = self._node.get_state())
         self.state = self.machine.initial
 
         __transitions = []
@@ -194,6 +195,7 @@ class StateHandler(object):
             event_data.transition.dest,
             event_data.event.name
         )
+        self.log_autoscaling_activity(event_data)
 
 
     def __log_before(self, event_data: EventData):
@@ -264,3 +266,10 @@ class StateHandler(object):
     def ignore_operation_failure(self, event_data: EventData):
         self.logger.debug("%s requires to ignore exceptions.", repr(event_data))
         self._raise_on_operation_failure = False
+
+
+    def log_autoscaling_activity(self, event_data: EventData = None):
+        activity = self.clients.get('autoscaling').get_autoscaling_activity(
+            self._event.get_autoscaling_group_name(), self._event.is_launching(), self._event.get_instance_id()
+        )
+        self.logger.info('autoscaling activity: %s on op %s', activity, event_data)

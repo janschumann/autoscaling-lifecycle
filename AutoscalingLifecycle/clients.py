@@ -158,6 +158,23 @@ class AutoscalingClient(BaseClient):
         return { }
 
 
+    def get_activity(self, group, is_launching, instance_id):
+        activities = self.client.describe_scaling_activities(
+            AutoScalingGroupName = group
+        )['Activities']
+
+        if is_launching:
+            desc = "Launching a new EC2 instance: " + instance_id
+        else:
+            desc = "Terminating EC2 instance: " + instance_id
+
+        for activity in activities:
+            if activity.get('Description') == desc:
+                return activity
+
+        return { }
+
+
 class DynamoDbClient(BaseClient):
     """
     Proxy for get_item, delete_item, scan etc. calls to the dynamodb service client
