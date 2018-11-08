@@ -28,6 +28,7 @@ class StateHandler(object):
     __states = { }
     __operations = { }
     _wait_for_next_event = False
+    _raise_on_operation_failure = True
     _node = None
     _event = None
     state = 'new'
@@ -84,7 +85,13 @@ class StateHandler(object):
                     if __source == self._node.get_state():
                         self.logger.info('state %s matched. pulling trigger %s', __source, __op)
                         func = getattr(self, __op)
-                        func()
+                        try:
+                            func()
+                        except Exception:
+                            if self._raise_on_operation_failure:
+                                raise
+                            self.logger.warning("Ignoring failure in trigger %s failed. Proceed to next trigger.")
+
                         self.logger.info('trigger %s complete', __op)
                         if self._wait_for_next_event:
                             self.logger.info('%s requires to wait for the next event.', __op)
@@ -250,3 +257,7 @@ class StateHandler(object):
 
     def wait_for_next_event(self):
         self._wait_for_next_event = True
+
+
+    def ignore_operation_failure(self):
+        self._raise_on_operation_failure = False
