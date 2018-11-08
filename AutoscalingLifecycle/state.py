@@ -12,20 +12,24 @@ from .repository import Repositories
 
 class StateHandler(object):
     """
-    :param __states: A dict of states
-    :type __states: dict
+    :param machine: A state machine instance
+    :type machine: Machine
     :param __operations: A dict of operations
     :type __operations: dict
     :param _wait_for_next_event: If set to true, the execution will be suspended until the next event occurs
     :type _wait_for_next_event: bool
+    :param _raise_on_operation_failuret: If set to true, transition will not halt on errors
+    :type _raise_on_operation_failure: bool
     :param _node: The node that triggered the event
     :type _node: Node
     :param _event: The event
     :type _event: Event
     :param state: The current state
     :type state: str
+    :param __allowed_transition_loops: The number of loops allowed
+    :type __allowed_transition_loops: int
     """
-    __states = { }
+    machine = None
     __operations = { }
     _wait_for_next_event = False
     _raise_on_operation_failure = True
