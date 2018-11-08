@@ -164,7 +164,7 @@ class StateHandler(object):
             # first update the node, than do the action and log the event
             __after = [self.__update_state] + __op.get('after', []) + [self.__log_after]
 
-            __conditions = __op.get('conditions', []),
+            __conditions = __op.get('conditions', [])
             # add successful event condition if needed
             if __op.get('require_successful_event', True):
                 __conditions = [self.__is_event_successful] + __conditions
