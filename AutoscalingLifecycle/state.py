@@ -273,7 +273,7 @@ class StateHandler(object):
 
 
     def log_autoscaling_activity(self, event_data: EventData = None):
-        activity = self.clients.get('autoscaling').get_autoscaling_activity(
+        activity = self.clients.get('autoscaling').get_activity(
             self._event.get_autoscaling_group_name(), self._event.is_launching(), self._event.get_instance_id()
         )
         self.logger.info('autoscaling activity: %s on op %s', activity, event_data)
