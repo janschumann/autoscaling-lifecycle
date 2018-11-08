@@ -168,6 +168,8 @@ class AutoscalingClient(BaseClient):
         else:
             desc = "Terminating EC2 instance: " + instance_id
 
+        self.logger.debug("Activities in group %s: %s, Filter: %s", group, activities, desc)
+
         for activity in activities:
             if activity.get('Description') == desc:
                 return activity
