@@ -66,10 +66,6 @@ class StateHandler(object):
             self.repositories.get('node').update(self._node, {
                 'ItemStatus': 'failure'
             })
-            # @todo is this necessary?
-            self.machine.initial = self._node.get_state()
-            self.state = self.machine.initial
-
         self.logger.debug('initializing the machine')
         self.__initialize_machine(send_event)
         self.logger.debug('machine initialized with %s', self.__operations)
