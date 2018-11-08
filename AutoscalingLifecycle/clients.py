@@ -2,9 +2,10 @@ from logging import Logger
 
 from boltons.tbutils import ExceptionInfo
 from botocore.client import BaseClient as BotoClient
+from botocore.exceptions import WaiterError
 
-from . import CustomWaiters
 from . import ClientFactory
+from . import CustomWaiters
 from .logging import Logging
 from .logging import MessageFormatter
 
@@ -17,8 +18,8 @@ class Clients(object):
     :param __clients: A dict of client instances
     :type __clients: dict
     """
-    __client_specs = {}
-    __clients = {}
+    __client_specs = { }
+    __clients = { }
 
 
     def __init__(self, cfactory: ClientFactory, waiters: CustomWaiters, logging: Logging):
@@ -28,10 +29,12 @@ class Clients(object):
 
 
     def add_client_spec(self, name, cls, *args):
-        self.__client_specs.update({name: {
-            'class': cls,
-            'args': args
-        }})
+        self.__client_specs.update({
+            name: {
+                'class': cls,
+                'args': args
+            }
+        })
 
 
     def get(self, name):
@@ -175,6 +178,19 @@ class AutoscalingClient(BaseClient):
                 return activity
 
         return { }
+
+
+    def wait_for_activity_to_complete(self, group: str, is_launching: bool, instance_id: str):
+        self.logger.debug('Autoscaling: Waiting for autoscaling activity to complete.')
+
+        try:
+            self.waiters.get_autoscaling_complete_for(instance_id, is_launching).wait(
+                AutoScalingGroupName = group
+            )
+        except WaiterError:
+            msg = 'Autoscaling: Error while waiting for autoscaling activity to complete: Activity not found for %s in %s'
+            self.logger.exception(msg, instance_id, group)
+            raise
 
 
 class DynamoDbClient(BaseClient):

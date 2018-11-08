@@ -234,6 +234,20 @@ waiters = CustomWaiters(client_factory, f.get_logger())
 
 l = f.get_logger()
 
+r = Clients(client_factory, waiters, f)
+r.add_client_spec('dynamodb', DynamoDbClient, 'state')
+r.add_client_spec('autoscaling', AutoscalingClient)
+r.add_client_spec('route53', Route53Client)
+r.add_client_spec('sns', SnsClient, client_factory.get('sns', 'eu-west-1'),
+                  'arn', 'account', 'environment')
+r.add_client_spec('ssm', SsmClient)
+
+a = r.get('autoscaling')
+act = a.get_activity('docker-swarm-manager-live', True, 'i-044d78177cb232ad7')
+
+w = waiters.get_autoscaling_complete_for('i-0b4605fe2b919a98d', True)
+w.wait(AutoScalingGroupName = 'docker-swarm-manager-live')
+
 l.info('message %s', message)
 
 e = None

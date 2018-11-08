@@ -487,6 +487,58 @@ class CustomWaiters(object):
         return self.get(name)
 
 
+    def get_autoscaling_complete_for(self, instance_id, is_launching):
+        """
+        :type size: int or str
+        :param size: The number of expected scan items to find
+
+        :rtype: botocore.waiter.Waiter
+        :return: The waiter object.
+        """
+
+        if is_launching:
+            desc = "Launching a new EC2 instance: " + instance_id
+            name = "AutoscalingCompleteForLaunching" + instance_id
+        else:
+            desc = "Terminating EC2 instance: " + instance_id
+            name = "AutoscalingCompleteForTerminating" + instance_id
+
+        if not self.__has(name):
+            model = botocore.waiter.WaiterModel({
+                "version": 2,
+                "waiters": {
+                    name: {
+                        "delay": 10,
+                        "operation": "DescribeScalingActivities",
+                        "maxAttempts": 6,
+                        "acceptors": [
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "failure",
+                                "argument": "length(Activities[?contains(Description, '" f"{desc}""')]) < `1`"
+                            },
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "retry",
+                                "argument": "Activities[?contains(Description, '" f"{desc}""')] | [0].Progress < `100`"
+                            },
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "success",
+                                "argument": "Activities[?contains(Description, '" f"{desc}""')] | [0].Progress == `100`"
+                            }
+                        ]
+                    }
+                }
+            })
+            self.__create(name, model, self.clients.get('autoscaling'))
+
+        return self.get(name)
+
+
     def __has(self, name: str):
         return name in self.waiters.keys()
 

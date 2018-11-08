@@ -267,3 +267,25 @@ class StateHandler(object):
             self._event.get_autoscaling_group_name(), self._event.is_launching(), self._event.get_instance_id()
         )
         self.logger.info('autoscaling activity: %s on op %s', activity, event_data)
+
+
+    def do_complete(self, event_data: EventData):
+        self.logger.info('completing autoscaling action for node %s', self._node.to_dict())
+        self.clients.get('autoscaling').complete_lifecycle_action(
+            self._event.get_lifecycle_hook_name(),
+            self._event.get_autoscaling_group_name(),
+            self._event.get_lifecycle_action_token(),
+            self._event.get_lifecycle_result(),
+            self._node.get_id()
+        )
+
+        self.clients.get('autoscaling').wait_for_activity_to_complete(
+            self._event.get_autoscaling_group_name(),
+            self._event.is_launching(),
+            self._node.get_id()
+        )
+
+
+    def do_remove(self, event_data: EventData):
+        self.logger.info('removing node %s from db', self._node.to_dict())
+        self.repositories.get('node').delete(self._node)
