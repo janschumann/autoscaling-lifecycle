@@ -31,6 +31,7 @@ class StateHandler(object):
     _node = None
     _event = None
     state = 'new'
+    __allowed_transition_loops = 3
 
 
     def __init__(self, clients: Clients, repositories: Repositories, logging_factory: Logging):
@@ -73,6 +74,9 @@ class StateHandler(object):
             self.logger.error('Machine is not initialized. Please call prepare_machine() before.')
             return
 
+        if 1 > self.__allowed_transition_loops or self._wait_for_next_event:
+            return
+
         self.logger.info('find trigger for %s', self._node.to_dict())
         try:
             for __op, __options in self.__operations.items():
@@ -96,6 +100,12 @@ class StateHandler(object):
 
             # try graceful completion and raise on error
             self(True)
+
+        # @todo this should not be necessary: remove this after testing the correct termination criterion has been found
+        # no last operation found. try again
+        self.__allowed_transition_loops -= 1
+        self.logger.debug('no last operation found. try again. retries left: %s', self.__allowed_transition_loops)
+        self()
 
 
     def __initialize_machine(self):
@@ -140,14 +150,20 @@ class StateHandler(object):
         for __op in operations:
             # first log the event, than do the action
             __before = [self.__log_before] + __op.get('before', [])
+
             # first update the node, than do the action and log the event
-            __after = [self.__update_node] + __op.get('after', []) + [self.__log_after]
+            __after = [self.__update_state] + __op.get('after', []) + [self.__log_after]
+
+            __conditions = __op.get('conditions', []),
+            # add successful event condition if needed
+            if __op.get('require_successful_event', True):
+                __conditions = [self.__is_event_successful] + __conditions
 
             self.machine.add_transition(
                 __op.get('name'),
                 sources,
                 dest,
-                conditions = __op.get('conditions', []),
+                conditions = __conditions,
                 unless = __op.get('unless', []),
                 before = __before,
                 after = __after,
@@ -178,10 +194,15 @@ class StateHandler(object):
         self.__log_transition('Transitioned', event_data)
 
 
-    def __update_node(self, event_data: EventData):
-        self.repositories.get('node').update(self._node, {
-            'ItemStatus': event_data.transition.dest
-        })
+    def __update_state(self, event_data: EventData):
+        if event_data.transition.dest is not None:
+            self.repositories.get('node').update(self._node, {
+                'ItemStatus': event_data.transition.dest
+            })
+            self.machine.initial = self._node.get_state()
+            self.state = self.machine.initial
+        else:
+            self.wait_for_next_event()
 
 
     def _call_ssm_command(self, instance_id: str, comment: str, commands: list):
@@ -199,7 +220,7 @@ class StateHandler(object):
         :param commands: A list of commands to execute
         """
 
-        self._wait_for_next_event = True
+        self.wait_for_next_event()
 
         metadata = self._event.get_command_metadata()
         metadata.update({ 'RunningOn': instance_id })
@@ -221,3 +242,11 @@ class StateHandler(object):
                 comment,
                 repr(e)
             )
+
+
+    def __is_event_successful(self, event_data: EventData) -> bool:
+        return self._event.is_successful()
+
+
+    def wait_for_next_event(self):
+        self._wait_for_next_event = True

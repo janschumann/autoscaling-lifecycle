@@ -107,7 +107,7 @@ class AutoscalingClient(BaseClient):
 
 
     def complete_lifecycle_action(self, hook_name, group_name, token, result, instance_id):
-        self.logger.debug('Copleting lifecycle action for %s with %s', instance_id, result)
+        self.logger.debug('Completing lifecycle action for %s with %s', instance_id, result)
         _ = self.client.complete_lifecycle_action(
             LifecycleHookName = hook_name,
             AutoScalingGroupName = group_name,
