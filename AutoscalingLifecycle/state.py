@@ -26,8 +26,6 @@ class StateHandler(object):
     :type _event: Event
     :param state: The current state
     :type state: str
-    :param __allowed_transition_loops: The number of loops allowed
-    :type __allowed_transition_loops: int
     """
     machine = None
     __operations = { }
@@ -36,7 +34,6 @@ class StateHandler(object):
     _node = None
     _event = None
     state = 'new'
-    __allowed_transition_loops = 3
 
 
     def __init__(self, clients: Clients, repositories: Repositories, logging_factory: Logging):
@@ -78,12 +75,9 @@ class StateHandler(object):
         self.logger.debug('machine initialized with %s', self.__operations)
 
 
-    def __call__(self):
+    def __call__(self, raise_on_failure = False):
         if self._event is None or self._node is None:
             self.logger.error('Machine is not initialized. Please call prepare_machine() before.')
-            return
-
-        if 1 > self.__allowed_transition_loops or self._wait_for_next_event:
             return
 
         self.logger.info('find trigger for %s', self._node.to_dict())
@@ -111,16 +105,14 @@ class StateHandler(object):
                 'ItemStatus': 'failure'
             })
             # @todo is this necessary?
-            self.machine.initial = self._node.get_state()
-            self.state = self.machine.initial
-            # make sure failure state can be fulfilled
-            self.__allowed_transition_loops +=1
+            #self.machine.initial = self._node.get_state()
+            #self.state = self.machine.initial
+            if raise_on_failure:
+                raise
 
-        # @todo this should not be necessary: remove this after testing the correct termination criterion has been found
-        # no last operation found. try again
-        self.__allowed_transition_loops -= 1
-        self.logger.debug('no last operation found. try again. retries left: %s', self.__allowed_transition_loops)
-        self()
+            self(True)
+
+        self.logger.warning('termination criterion not met. no last operation found. Please make sure to add a transition calling wait_for_next_event() at the end of the transition.')
 
 
     def __initialize_machine(self, send_event: bool = True):
@@ -215,10 +207,8 @@ class StateHandler(object):
             self.repositories.get('node').update(self._node, {
                 'ItemStatus': event_data.transition.dest
             })
-            self.machine.initial = self._node.get_state()
-            self.state = self.machine.initial
-        else:
-            self.wait_for_next_event(event_data)
+            #self.machine.initial = self._node.get_state()
+            #self.state = self.machine.initial
 
 
     def _call_ssm_command(self, instance_id: str, comment: str, commands: list):
