@@ -1,8 +1,6 @@
 import json
 import types
 import unittest
-from logging import INFO
-from logging import StreamHandler
 from unittest import mock
 
 from transitions.core import Condition
@@ -57,9 +55,9 @@ class TestLifecycleHandler(unittest.TestCase):
 
     def setUp(self):
         logging = Logging("TEST", True)
-        h = StreamHandler()
-        h.setLevel(INFO)
-        logging.add_handler(h, "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
+        # h = StreamHandler()
+        # h.setLevel(INFO)
+        # logging.add_handler(h, "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
 
         client = MockDynamoDbClient(mock.Mock(), mock.Mock(), logging, 'table')
         repositories = Repositories(client, logging.get_logger())
@@ -425,7 +423,7 @@ class TestLifecycleHandler(unittest.TestCase):
                         'name': 'add_labels',
                         'conditions': [self.true_condition],
                         'before': [self.trigger_no_error],
-                        #'stop_after_state_change': True
+                        # 'stop_after_state_change': True
                     }
                 ]
             },

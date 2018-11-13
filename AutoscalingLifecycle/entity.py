@@ -12,6 +12,7 @@ class Repository(object):
 class Repositories(Repository):
     __repositories = { }
 
+
     def set(self, name: str, repo: Repository):
         self.__repositories.update({ name: repo })
 

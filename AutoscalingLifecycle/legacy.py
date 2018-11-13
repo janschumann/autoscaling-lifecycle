@@ -5,17 +5,17 @@ from logging import Logger
 
 from boto3 import Session
 
-from . import ClientFactory
-from . import CustomWaiters
-from . import Node
 from .clients import AutoscalingClient
+from .clients import ClientFactory
+from .clients import CustomWaiters
 from .clients import DynamoDbClient
 from .clients import Route53Client
 from .clients import SnsClient
 from .clients import SsmClient
-from .logging import Logging
 from .entity import CommandRepository
+from .entity import Node
 from .entity import NodeRepository
+from .logging import Logging
 
 
 class EventAction(object):
@@ -201,10 +201,10 @@ class EventAction(object):
         client_factory = ClientFactory(session = session, logger = self.logger)
         waiters = CustomWaiters(clients = client_factory, logger = self.logger)
         self.dynamodb_client = DynamoDbClient(
-            client = client_factory.get('dynamodb'),
-            state_table = name.lower() + '-state',
-            logging = logger_factory,
-            waiters = waiters
+            client_factory.get('dynamodb'),
+            waiters,
+            logger_factory,
+            name.lower() + '-state',
         )
         self.node_repository = NodeRepository(self.dynamodb_client, self.logger)
         self.command_repository = CommandRepository(self.dynamodb_client, self.logger)

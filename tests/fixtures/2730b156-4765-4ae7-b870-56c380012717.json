@@ -1,32 +1,32 @@
 {
-    "Commands": "/bin/join_cluster.sh",
-    "Comment": "Launching worker -> join cluster",
-    "Ident": "2730b156-4765-4ae7-b870-56c380012717",
-    "ItemType": "command",
-    "RunningOn": "i-007de616626a946ce",
-    "account": "390028087082",
-    "detail": {
-      "AutoScalingGroupName": "docker-swarm-worker-live",
-      "EC2InstanceId": "i-007de616626a946ce",
-      "LifecycleActionToken": "b502e984-0367-4aed-ab0b-963a602ed94c",
-      "LifecycleHookName": "docker-swarm-worker-live-on-launch",
-      "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
-      "NotificationMetadata": {
-        "account": "tooling",
-        "debug": "false",
-        "environment": "live",
-        "name": "docker-swarm",
-        "type": "worker",
-        "workerDnsName": "docker-worker.tooling.live.7nxt.internal",
-        "workerDnsTtl": "60",
-        "workerZoneId": "Z16LNJ5269K3PA"
-      }
-    },
-    "detail-type": "EC2 Instance-launch Lifecycle Action",
-    "id": "59e6cd57-3459-6438-76fd-b7418f61efbd",
-    "region": "eu-central-1",
-    "resources": "['arn:aws:autoscaling:eu-central-1:390028087082:autoScalingGroup:4ad01eef-7609-4627-87c5-499170c292b5:autoScalingGroupName/docker-swarm-worker-live']",
-    "source": "aws.autoscaling",
-    "time": "2018-11-08T18:43:06Z",
-    "version": "0"
+  "Commands": "/bin/join_cluster.sh",
+  "Comment": "Launching worker -> join cluster",
+  "Ident": "2730b156-4765-4ae7-b870-56c380012717",
+  "ItemType": "command",
+  "RunningOn": "i-007de616626a946ce",
+  "account": "390028087082",
+  "detail": {
+    "AutoScalingGroupName": "docker-swarm-worker-live",
+    "EC2InstanceId": "i-007de616626a946ce",
+    "LifecycleActionToken": "b502e984-0367-4aed-ab0b-963a602ed94c",
+    "LifecycleHookName": "docker-swarm-worker-live-on-launch",
+    "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
+    "NotificationMetadata": {
+      "account": "tooling",
+      "debug": "false",
+      "environment": "live",
+      "name": "docker-swarm",
+      "type": "worker",
+      "workerDnsName": "docker-worker.tooling.live.7nxt.internal",
+      "workerDnsTtl": "60",
+      "workerZoneId": "Z16LNJ5269K3PA"
+    }
+  },
+  "detail-type": "EC2 Instance-launch Lifecycle Action",
+  "id": "59e6cd57-3459-6438-76fd-b7418f61efbd",
+  "region": "eu-central-1",
+  "resources": "['arn:aws:autoscaling:eu-central-1:390028087082:autoScalingGroup:4ad01eef-7609-4627-87c5-499170c292b5:autoScalingGroupName/docker-swarm-worker-live']",
+  "source": "aws.autoscaling",
+  "time": "2018-11-08T18:43:06Z",
+  "version": "0"
 }

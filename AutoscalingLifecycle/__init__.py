@@ -274,25 +274,31 @@ class Model(object):
         self.formatter = logging.get_formatter()
 
 
+    def load_event(self, message) -> Event:
+        self._event = Event.from_sns_message(message, self.get_node_repository(), self.get_command_repository())
+        # set the initial state
+        self._state = self._event.node.get_state()
+        # reset seen states
+        self.seen_states = []
+
+        return self.event
+
+
     @property
-    def event(self):
+    def event(self) -> Event:
         return self._event
 
-    @event.setter
-    def event(self, event: Event):
-        self._state = event.node.get_state()
-        self.seen_states = []
-        self._event = event
-
 
     @property
-    def state(self):
+    def state(self) -> str:
         return self._state
 
+
     @state.setter
-    def state(self, value):
-        # ignore the initial state update performed by the machine
-        if value == 'initial':
+    def state(self, value: str):
+        # ignore state updates until an event has been loaded
+        # @see self.load_event()
+        if self._state is None:
             return
 
         self._state = value
@@ -425,7 +431,7 @@ class LifecycleHandler(object):
                     self.__add_transition(sources, dest, trigger)
                 except TriggerParameterConfigurationError as e:
                     msg = "Configuration error for source states '%s' in trigger '%s': '%s'" % (
-                    ', '.join(sources), trigger.get('name'), e.get_message())
+                        ', '.join(sources), trigger.get('name'), e.get_message())
                     self.__get_logger().error(msg)
                     raise ConfigurationError(msg)
 
@@ -489,12 +495,10 @@ class LifecycleHandler(object):
     #
 
     def __call__(self, message: dict):
-        event = Event.from_sns_message(message, self.__get_node_repository(),
-                                       self.machine.model.repositories.get('command'))
+        event = self.__get_model().load_event(message)
 
-        self.__get_logger().info('processing event %s with data: (event)%s, (node)%s', repr(event),
-                                 event.get_event(),
-                                 event.node.to_dict())
+        msg = 'processing event %s with data: (event)%s, (node)%s'
+        self.__get_logger().info(msg, repr(event), event.get_event(), event.node.to_dict())
 
         if event.is_launching() and event.is_autoscaling() and not event.node.is_new():
             raise self.__get_formatter().get_error(RuntimeError, "Only new nodes can be launched.")
@@ -502,8 +506,7 @@ class LifecycleHandler(object):
         if event.is_terminating() and event.node.is_new():
             raise self.__get_formatter().get_error(RuntimeError, "New nodes cannot terminate.")
 
-        self.__get_model().event = event
-
+        # fail early, if no triggers can be found for the state
         triggers = self.machine.get_triggers(self.__get_model().state)
         if len(triggers) < 1:
             raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
@@ -529,17 +532,15 @@ class LifecycleHandler(object):
                         # not correct due to incorrect doc comments. **kwargs is always of type tuple not dict
                         self.machine.dispatch(trigger, event = event)
                     except Exception as e:
-                        # fetch next transitions
                         if self._raise_on_operation_failure:
                             raise
 
-                        msg = 'Ignoring failure %s in trigger %s.'
-                        self.__get_logger().exception(msg, repr(e), trigger)
-
+                        self.__get_logger().exception('Ignoring failure %s in trigger %s.', repr(e), trigger)
                         # in case the error occurred somewhere before the state change,
                         # we need to find the destination state and update the model,
                         # to be able to proceed with next triggers
-                        # if the destination state is None, the model state is not updated
+                        # a destination state of None indicates an internal transition and the model
+                        # will not be updated
                         transitions = self.machine.events.get(trigger).transitions.get(self.__get_model().state)
                         if transitions is not None and transitions[0].dest is not None:
                             msg = 'Trigger pulled before state change or error in conditions. Forcing state to %s'
@@ -548,29 +549,30 @@ class LifecycleHandler(object):
 
                     self.__get_logger().info('trigger %s complete', trigger)
 
-                    transitions = self.machine.events.get(trigger).transitions.get(self.__get_model().state)
-                    if transitions is None:
-                        # state has changed
-                        if self._stop:
-                            self.__get_logger().debug('trigger %s caused the loop to stop', trigger)
-                            return
+                    if self._stop:
+                        self.__get_logger().debug('trigger %s caused the loop to stop', trigger)
+                        return
+
+                    if self.__get_model().state != state:
                         # the state change has been applied
-                        # do not pull more triggers
+                        # proceed with next triggers
                         break
 
-                # do not load more triggers if state has not changed
                 if self.__get_model().state == state:
-                    triggers = []
-                else:
-                    # load new triggers from new state
-                    triggers = self.machine.get_triggers(self.__get_model().state)
+                    # state has not changed after pulling all possible triggers
+                    # stop processing
+                    break
+
+                # load new triggers from updated state
+                triggers = self.machine.get_triggers(self.__get_model().state)
 
         except Exception as e:
             if self.__in_failure_handling:
                 self.__get_logger().exception("An error occured during failure handling.", repr(e))
                 raise
 
-            self.__get_logger().exception("An error occured during transition. %s. Entring failure handling.", repr(e))
+            msg = "An error occurred during transition. %s. Entering failure handling."
+            self.__get_logger().exception(msg, repr(e))
             self.__in_failure_handling = True
 
             self.machine.model.state = 'failure'
@@ -595,6 +597,7 @@ class LifecycleHandler(object):
             event_data.transition.dest,
             event_data.event.name
         )
+        self.__log_autoscaling_activity(event_data)
 
 
     def __log_before(self, event_data: EventData):
@@ -630,7 +633,7 @@ class LifecycleHandler(object):
             return
 
         self.__get_logger().info('%s %s autoscaling activity on event %s: %s', activity.get('StatusCode').upper(),
-                                 'launching' if _event.is_launching else 'terminationg',
+                                 'launching' if _event.is_launching else 'terminating',
                                  repr(event_data), activity)
 
 
