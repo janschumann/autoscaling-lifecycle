@@ -1,7 +1,7 @@
 import json
 import types
 import unittest
-from logging import DEBUG
+from logging import INFO
 from logging import StreamHandler
 from unittest import mock
 
@@ -58,7 +58,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def setUp(self):
         logging = Logging("TEST", True)
         h = StreamHandler()
-        h.setLevel(DEBUG)
+        h.setLevel(INFO)
         logging.add_handler(h, "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
 
         client = MockDynamoDbClient(mock.Mock(), mock.Mock(), logging, 'table')
