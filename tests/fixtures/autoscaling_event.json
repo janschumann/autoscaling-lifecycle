@@ -1,0 +1,22 @@
+{
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventSubscriptionArn": "arn:aws:sns:eu-central-1:390028087082:docker-swarm-live-lifecycle:0945bfe5-445e-4ba1-abcb-362521f268e0",
+      "EventVersion": "1.0",
+      "Sns": {
+        "Message": "{\"version\":\"0\",\"id\":\"babaf42e-aac5-8e19-cf36-83307aa13879\",\"detail-type\":\"EC2 Instance-terminate Lifecycle Action\",\"source\":\"aws.autoscaling\",\"account\":\"390028087082\",\"time\":\"2018-11-08T17:02:04Z\",\"region\":\"eu-central-1\",\"resources\":[\"arn:aws:autoscaling:eu-central-1:390028087082:autoScalingGroup:ac97bd5b-c95f-4027-adb0-eec3b99987e2:autoScalingGroupName/docker-swarm-manager-live\"],\"detail\":{\"LifecycleActionToken\":\"05e8ec37-956a-4fe1-be7c-e43b4e4f9cd9\",\"AutoScalingGroupName\":\"docker-swarm-manager-live\",\"LifecycleHookName\":\"docker-swarm-manager-live-on-launch\",\"EC2InstanceId\":\"i-007de616626a94600\",\"LifecycleTransition\":\"autoscaling:EC2_INSTANCE_LAUNCHING\",\"NotificationMetadata\":\"{\\n  \\\"type\\\": \\\"manager\\\",\\n  \\\"name\\\": \\\"docker-swarm\\\",\\n  \\\"account\\\": \\\"tooling\\\",\\n  \\\"environment\\\": \\\"live\\\",\\n  \\\"managerZoneId\\\": \\\"Z16LNJ5269K3PA\\\",\\n  \\\"managerDnsName\\\": \\\"docker-manager.tooling.live.7nxt.internal\\\",\\n  \\\"managerDnsTtl\\\": \\\"60\\\",\\n  \\\"debug\\\": \\\"false\\\"\\n}\\n\"}}",
+        "MessageAttributes": {},
+        "MessageId": "b736e16a-bcb3-54fe-ba7b-b534d2fe409b",
+        "Signature": "IKHs/1AO4TIHC3wVvvLKrdGNYLNA/b/NYFQcJNDoso9fwrKtiXkymg90CDaAoWrTf8rbjZuTECzg5ztiPkSYXTHdu+l1uN7MRpdRzjp/2kK4A9rAsvnjAjS1p9zcp85gWUBtogmQ2FFzUjPp51q9HjUU7p6rD2GAwos8mR0eJ+V0aQV1jJZLT+/tIujbUjuSza7OYopLqK615ypNd4ivXmdSUEqaB4G65QbmubjzNvpT+U5dUBF/s4+QqSWT7uQsOs7S/i0j2FrEtPHnPxu7ihssKcoVkJIqqV55vTqUHZKO9KHfUL8r+i30VJHzjnCsCbtANk2jZbLohdbkgojMJA==",
+        "SignatureVersion": "1",
+        "SigningCertUrl": "https://sns.eu-central-1.amazonaws.com/SimpleNotificationService-ac565b8b1a6c5d002d285f9598aa1d9b.pem",
+        "Subject": null,
+        "Timestamp": "2018-11-08T17:02:05.055Z",
+        "TopicArn": "arn:aws:sns:eu-central-1:390028087082:docker-swarm-live-lifecycle",
+        "Type": "Notification",
+        "UnsubscribeUrl": "https://sns.eu-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:eu-central-1:390028087082:docker-swarm-live-lifecycle:0945bfe5-445e-4ba1-abcb-362521f268e0"
+      }
+    }
+  ]
+}

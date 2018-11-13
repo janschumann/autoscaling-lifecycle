@@ -7,7 +7,10 @@ from botocore.client import BaseClient
 
 class MessageFormatter(object):
 
-    def __init__(self, name: str = ''):
+    def __init__(self, name: str = '', format_pretty: bool = False):
+        self.indent = None
+        if format_pretty:
+            self.indent = 4
         self.name = name
 
 
@@ -44,7 +47,7 @@ class MessageFormatter(object):
         return json.dumps(
             data,
             sort_keys = True,
-            indent = None,
+            indent = self.indent,
             ensure_ascii = True,
             default = self.__json_convert
         )
@@ -76,8 +79,8 @@ class MessageFormatter(object):
 
 class Logging(object):
 
-    def __init__(self, name, level):
-        self.formatter = MessageFormatter(name)
+    def __init__(self, name: str, format_pretty: bool = False):
+        self.formatter = MessageFormatter(name, format_pretty)
         self.logger = logging.getLogger()
         # remove handlers from root logger
         for h in self.logger.handlers:
@@ -86,14 +89,13 @@ class Logging(object):
         # remove handlers from our logger
         for h in self.logger.handlers:
             self.logger.removeHandler(h)
-        self.logger.setLevel(level)
+        self.logger.setLevel(logging.DEBUG)
 
 
     def add_handler(self, ch: logging.Handler, log_format: str):
         formatter = Formatter(log_format)
         formatter.set_formatter(self.formatter)
         ch.setFormatter(formatter)
-        ch.setLevel(logging.DEBUG)
         self.logger.addHandler(ch)
 
 

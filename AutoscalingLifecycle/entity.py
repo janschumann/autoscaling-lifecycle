@@ -1,36 +1,34 @@
 from logging import Logger
 
-from . import Node
 from .clients import DynamoDbClient
 
 
-class Repositories(object):
-
-    __repositoroes = {}
-
+class Repository(object):
     def __init__(self, client: DynamoDbClient, logger: Logger):
         self.client = client
         self.logger = logger
 
 
+class Repositories(Repository):
+    __repositories = { }
+
+    def set(self, name: str, repo: Repository):
+        self.__repositories.update({ name: repo })
+
+
     def add(self, name, cls):
-        self.__repositoroes.update({name: cls(self.client, self.logger)})
+        self.__repositories.update({ name: cls(self.client, self.logger) })
 
 
     def get(self, name):
-        repository = self.__repositoroes.get(name, None)
+        repository = self.__repositories.get(name, None)
         if repository is None:
             raise RuntimeError("No repository %s", name)
 
         return repository
 
 
-class CommandRepository(object):
-
-    def __init__(self, client: DynamoDbClient, logger: Logger):
-        self.client = client
-        self.logger = logger
-
+class CommandRepository(Repository):
 
     def register(self, id: str, data: dict):
         self.client.put_item(id, 'command', data)
@@ -44,12 +42,105 @@ class CommandRepository(object):
         self.client.delete_item(id)
 
 
-class NodeRepository(object):
+class Node(object):
+    id = None
+    type = None
+    status = 'new'
+    data = { }
+    mandatory_propertoes = [
+        'EC2InstanceId',
+        'ItemType',
+        'ItemStatus',
+    ]
+    readonly_propertoes = [
+        'EC2InstanceId',
+        'ItemType',
+    ]
 
-    def __init__(self, client: DynamoDbClient, logger: Logger):
-        self.client = client
-        self.logger = logger
 
+    def __init__(self, id, node_type):
+        if id == "" or id is None or node_type == "" or node_type is None:
+            raise TypeError("id and node_type must not be empty")
+
+        self.data = { }
+        self.id = id
+        self.data.update({ 'EC2InstanceId': self.id })
+        self.type = node_type
+        self.data.update({ 'ItemType': self.type })
+        self.data.update({ 'ItemStatus': self.status })
+
+
+    def get_id(self):
+        return self.id
+
+
+    def get_type(self):
+        return self.type
+
+
+    def set_type(self, node_type):
+        self.type = node_type
+        self.data.update({ 'ItemType': self.type })
+
+
+    def get_status(self):
+        return self.status
+
+
+    def set_status(self, status):
+        self.status = status
+        self.data.update({ 'ItemStatus': self.status })
+
+
+    def get_property(self, property, default = None):
+        return self.data.get(property, default)
+
+
+    def set_property(self, property, value):
+        if property == 'ItemStatus':
+            self.set_status(value)
+        else:
+            self.data.update({ property: value })
+
+
+    def unset_property(self, property):
+        if property in self.mandatory_propertoes:
+            raise TypeError(property + ' cannot be unset.')
+
+        _ = self.data.pop(property)
+
+
+    def is_valid(self):
+        return self.id != ''
+
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'type': self.type,
+            'status': self.status,
+            'data': self.data
+        }
+
+
+    def set_state(self, dest):
+        self.set_status(dest)
+
+
+    def get_state(self) -> str:
+        return self.status
+
+
+    def is_new(self) -> bool:
+        return self.status == 'new'
+
+
+    def set_id(self, ident):
+        self.id = ident
+        self.data.update({ 'EC2InstanceId': self.id })
+
+
+class NodeRepository(Repository):
 
     def register(self, id: str, node_type: str, data: dict) -> Node:
         node = Node(id, node_type)

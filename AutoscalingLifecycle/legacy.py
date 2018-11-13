@@ -14,8 +14,8 @@ from .clients import Route53Client
 from .clients import SnsClient
 from .clients import SsmClient
 from .logging import Logging
-from .repository import CommandRepository
-from .repository import NodeRepository
+from .entity import CommandRepository
+from .entity import NodeRepository
 
 
 class EventAction(object):

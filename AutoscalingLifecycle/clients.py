@@ -1,13 +1,281 @@
 from logging import Logger
 
+import botocore.waiter as waiter
 from boltons.tbutils import ExceptionInfo
+from boto3 import Session
 from botocore.client import BaseClient as BotoClient
 from botocore.exceptions import WaiterError
 
-from . import ClientFactory
-from . import CustomWaiters
 from .logging import Logging
 from .logging import MessageFormatter
+
+
+class ClientFactory(object):
+    """
+    A simple class that creates boto3 service clients. Each client will be created only once
+    and than returned from local cache
+    """
+
+
+    def __init__(self, session: Session, logger: Logger):
+        """
+
+        :param session: A boto3 Session instamce
+        :type session: Session
+        :param logger: A LifecycleLogger instance
+        :type logger: LifecycleLogger
+        """
+        self.session = session
+        self.logger = logger
+        self.clients = { }
+
+
+    def get(self, name: str, region_name: str = 'eu-central-1'):
+        """
+        Get a boto client. Clients will be cached locally.
+        E.g. get_client('ssm') will return boto3.client('ssm')
+
+        :type name: str
+        :param name: The name of the client to create
+
+        :type region_name: str
+        :param region_name: The region this client will be created in
+
+        :rtype: BaseClient
+        :return: Service client instance
+        """
+
+        self.logger.debug('Retrieving client %s in region %s', name, region_name)
+        key = name + '_' + region_name
+        client = self.clients.get(key, None)
+        if client is None:
+            self.logger.debug('Client %s in region %s not created. Creating ...', name, region_name)
+            client = self.session.client(name, region_name = region_name)
+            self.clients.update({ key: client })
+
+        return client
+
+
+class CustomWaiters(object):
+    model_configs = {
+        'ScanCountGt0': {
+            'client': 'dynamodb',
+            'model': {
+                "version": 2,
+                "waiters": {
+                    "ScanCountGt0": {
+                        "delay": 15,
+                        "operation": "Scan",
+                        "maxAttempts": 40,
+                        "acceptors": [
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "success",
+                                "argument": "length(Items[]) > `0`"
+                            },
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "retry",
+                                "argument": "length(Items[]) == `0`"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'InstancesInService': {
+            'client': 'autoscaling',
+            'model': {
+                "version": 2,
+                "waiters": {
+                    "InstancesInService": {
+                        "delay": 5,
+                        "operation": "DescribeAutoScalingInstances",
+                        "maxAttempts": 10,
+                        "acceptors": [
+                            {
+                                "expected": "InService",
+                                "matcher": "pathAny",
+                                "state": "success",
+                                "argument": "AutoScalingInstances[].LifecycleState"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'AgentIsOnline': {
+            'client': 'ssm',
+            'model': {
+                "version": 2,
+                "waiters": {
+                    "AgentIsOnline": {
+                        "delay": 10,
+                        "operation": "DescribeInstanceInformation",
+                        "maxAttempts": 20,
+                        "acceptors": [
+                            {
+                                "expected": "Online",
+                                "matcher": "pathAny",
+                                "state": "success",
+                                "argument": "InstanceInformationList[].PingStatus"
+                            },
+                            {
+                                "expected": "ConnectionLost",
+                                "matcher": "pathAny",
+                                "state": "retry",
+                                "argument": "InstanceInformationList[].PingStatus"
+                            },
+                            {
+                                "expected": "Inactive",
+                                "matcher": "pathAny",
+                                "state": "failure",
+                                "argument": "InstanceInformationList[].PingStatus"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    waiters = { }
+
+
+    def __init__(self, clients: ClientFactory, logger: Logger):
+        """
+        :type clients: ClientFactory
+        :param clients:
+        :type logger: LifecycleLogger
+        :param logger:
+        """
+        self.clients = clients
+        self.logger = logger
+        self.message_formatter = MessageFormatter(logger.name)
+
+
+    def get_waiter_names(self):
+        """
+        :rtype: list
+        :return: A list of waiter names
+        """
+        return self.model_configs.keys()
+
+
+    def get(self, name):
+        """
+        :type name: str
+        :param name: The name of the waiter
+
+        :rtype: botocore.waiter.Waiter
+        :return: The waiter object.
+        """
+
+        if not self.__has(name):
+            config = self.model_configs.get(name)
+            model = waiter.WaiterModel(config.get('model'))
+            client = self.clients.get(config.get('client'))
+            self.__create(name, model, client)
+
+        return self.waiters.get(name)
+
+
+    def get_dynamodb_scan_count_is(self, size):
+        """
+        :type size: int or str
+        :param size: The number of expected scan items to find
+
+        :rtype: botocore.waiter.Waiter
+        :return: The waiter object.
+        """
+        name = "ScanCountIs" + str(size)
+
+        if not self.__has(name):
+            model = waiter.WaiterModel({
+                "version": 2,
+                "waiters": {
+                    name: {
+                        "delay": 15,
+                        "operation": "Scan",
+                        "maxAttempts": 40,
+                        "acceptors": [
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "success",
+                                "argument": "length(Items[]) == " f"`{size}`"
+                            }
+                        ]
+                    }
+                }
+            })
+            self.__create(name, model, self.clients.get('dynamodb'))
+
+        return self.get(name)
+
+
+    def get_autoscaling_complete_for(self, instance_id, is_launching):
+        """
+        :type size: int or str
+        :param size: The number of expected scan items to find
+
+        :rtype: botocore.waiter.Waiter
+        :return: The waiter object.
+        """
+
+        if is_launching:
+            desc = "Launching a new EC2 instance: " + instance_id
+            name = "AutoscalingCompleteForLaunching" + instance_id
+        else:
+            desc = "Terminating EC2 instance: " + instance_id
+            name = "AutoscalingCompleteForTerminating" + instance_id
+
+        if not self.__has(name):
+            model = waiter.WaiterModel({
+                "version": 2,
+                "waiters": {
+                    name: {
+                        "delay": 10,
+                        "operation": "DescribeScalingActivities",
+                        "maxAttempts": 6,
+                        "acceptors": [
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "failure",
+                                "argument": "length(Activities[?contains(Description, '" f"{desc}""')]) < `1`"
+                            },
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "retry",
+                                "argument": "Activities[?contains(Description, '" f"{desc}""')] | [0].Progress < `100`"
+                            },
+                            {
+                                "expected": True,
+                                "matcher": "path",
+                                "state": "success",
+                                "argument": "Activities[?contains(Description, '" f"{desc}""')] | [0].Progress == `100`"
+                            }
+                        ]
+                    }
+                }
+            })
+            self.__create(name, model, self.clients.get('autoscaling'))
+
+        return self.get(name)
+
+
+    def __has(self, name: str):
+        return name in self.waiters.keys()
+
+
+    def __create(self, name: str, model: waiter.WaiterModel, client: BotoClient):
+        if name not in model.waiter_names:
+            raise self.message_formatter.get_error(KeyError, 'Waiter %s does not exist', name)
+
+        self.waiters.update({ name: waiter.create_waiter_with_client(name, model, client) })
 
 
 class Clients(object):
@@ -170,8 +438,6 @@ class AutoscalingClient(BaseClient):
             desc = "Launching a new EC2 instance: " + instance_id
         else:
             desc = "Terminating EC2 instance: " + instance_id
-
-        self.logger.debug("Activities in group %s: %s, Filter: %s", group, activities, desc)
 
         for activity in activities:
             if activity.get('Description') == desc:

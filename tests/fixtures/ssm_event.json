@@ -1,0 +1,22 @@
+{
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventSubscriptionArn": "arn:aws:sns:eu-central-1:390028087082:docker-swarm-live-lifecycle:0945bfe5-445e-4ba1-abcb-362521f268e0",
+      "EventVersion": "1.0",
+      "Sns": {
+        "Message": "{\"version\":\"0\",\"id\":\"a3829ee7-ec13-7d7e-0ae2-7b5f889f3bda\",\"detail-type\":\"EC2 Command Status-change Notification\",\"source\":\"aws.ssm\",\"account\":\"390028087082\",\"time\":\"2018-11-08T18:43:35Z\",\"region\":\"eu-central-1\",\"resources\":[\"arn:aws:ec2:eu-central-1:390028087082:instance/i-0f5eb341c49cb9185\"],\"detail\":{\"command-id\":\"2730b156-4765-4ae7-b870-56c380012717\",\"document-name\":\"AWS-RunShellScript\",\"requested-date-time\":\"2018-11-08T18:43:30.506Z\",\"expire-after\":\"2018-11-08T20:43:30.506Z\",\"output-s3bucket-name\":\"\",\"output-s3key-prefix\":\"\",\"parameters\":\"{\\\"commands\\\":[\\\"/bin/join_cluster.sh\\\"]}\",\"status\":\"Success\"}}",
+        "MessageAttributes": {},
+        "MessageId": "133837a1-7329-5c63-956b-63fff53276dc",
+        "Signature": "Rwour1fOJftVdAXydxCpL3EsNVqHmIhKTAk8gYtOjJwzLSGq07ZyI2rDCucBiP6rHqNRK7t96vcSU7mKtbGlXOzfhsXLUQJUowLog88ceqeGmaMMMkLCjzLv8+HChw5Bf8v7Y0XXrofUs0cJ8Pk75M2QqM4GquF27ctyesJ7XqsvLU9A2vtGtvhzI/N5uY0qxCOJIA92p+EqlkZOzTiL22ec7BITsKaZoqFeZZ8uaW24WDYaqA0CbbKiUrB7jIZ+QkIqapUpokvhMVNVgvzbC/+P/f3S85xpUzGGXPEGj/vY5HXNWm6UJfjQ+9K9UPAdIsf3J1pRaZAL2IGGmOWNzA==",
+        "SignatureVersion": "1",
+        "SigningCertUrl": "https://sns.eu-central-1.amazonaws.com/SimpleNotificationService-ac565b8b1a6c5d002d285f9598aa1d9b.pem",
+        "Subject": null,
+        "Timestamp": "2018-11-08T18:43:39.487Z",
+        "TopicArn": "arn:aws:sns:eu-central-1:390028087082:docker-swarm-live-lifecycle",
+        "Type": "Notification",
+        "UnsubscribeUrl": "https://sns.eu-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:eu-central-1:390028087082:docker-swarm-live-lifecycle:0945bfe5-445e-4ba1-abcb-362521f268e0"
+      }
+    }
+  ]
+}
