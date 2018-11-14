@@ -420,7 +420,7 @@ class Model(object):
             _node.get_id()
         )
 
-        self.report_autoscaling_activity(_event)
+        self.report()
 
 
     def do_remove_from_db(self, event_data: EventData):
@@ -661,10 +661,11 @@ class LifecycleHandler(object):
 
     def __is_event_successful(self, event_data: EventData) -> bool:
         status = self.__get_event(event_data).is_successful()
-        if status:
-            self.__get_logger().debug("Event was successful.")
-        else:
-            self.__get_logger().error("Event was not successful.")
+        if self.__get_event(event_data).has_command():
+            if status:
+                self.__get_logger().debug("Command was successful.")
+            else:
+                self.__get_logger().error("Command was not successful.")
 
         return status
 
