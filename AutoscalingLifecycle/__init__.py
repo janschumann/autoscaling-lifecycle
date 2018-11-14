@@ -71,6 +71,7 @@ class Event(object):
         self._event = event
         if self.is_command():
             self._command = command_repository.get(self._event.get('detail').get('command-id'))
+            command_repository.delete(self._event.get('detail').get('command-id'))
         self.node = node_repository.get(self.get_instance_id())
 
 
@@ -356,9 +357,9 @@ class Model(object):
 
 
     def do_register(self, event_data: EventData):
-        _node = self.get_event(event_data).node
-        self.logger.info('removing node %s from db', _node.to_dict())
-        self.repositories.get('node').delete(_node)
+        _event = self.get_event(event_data)
+        _event.node.set_type(_event.get_metadata().get('type'))
+        self.repositories.get('node').put(_event.node)
 
 
     def do_complete_lifecycle_action(self, event_data: EventData):
