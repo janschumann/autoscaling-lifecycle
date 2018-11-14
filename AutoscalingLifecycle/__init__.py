@@ -67,7 +67,7 @@ class Event(object):
 
     def __init__(self, event: dict, node_repository: NodeRepository, command_repository: CommandRepository):
         self._event = event
-        if self.is_command():
+        if self.has_command():
             self._command = command_repository.get(self._event.get('detail').get('command-id'))
             command_repository.delete(self._event.get('detail').get('command-id'))
         self.node = node_repository.get(self.get_instance_id())
@@ -102,7 +102,7 @@ class Event(object):
         return self.get_source() == self.__AUTOSCALING
 
 
-    def is_command(self) -> bool:
+    def has_command(self) -> bool:
         return self.get_source() == self.__COMMAND
 
 
@@ -206,6 +206,7 @@ class SsmEvent(Event):
         )
         return msg
 
+
     def get_command_id(self):
         return self._event.get('detail').get('command-id')
 
@@ -279,7 +280,7 @@ class Model(object):
     _state = None
     seen_states = []
 
-    __cloud_init_delay = 20
+    __cloud_init_delay = 45
 
     EVENT = 'event'
     NODE = 'node'
@@ -299,6 +300,8 @@ class Model(object):
         self._state = self._event.node.get_state()
         # reset seen states
         self.seen_states = []
+
+        self.report()
 
         return self.event
 
@@ -331,19 +334,23 @@ class Model(object):
         raise NotImplementedError()
 
 
-    def report_autoscaling_activity(self, event: Event):
-        activity = self.clients.get('autoscaling').get_activity(
-            event.get_autoscaling_group_name(),
-            event.is_launching(),
-            event.node.get_id()
-        )
-        self.logger.debug('Reporting activity: %s', activity)
-        self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
+    def report(self):
+        if self._event.is_autoscaling():
+            activity = self.clients.get('autoscaling').get_activity(
+                self._event.get_autoscaling_group_name(),
+                self._event.is_launching(),
+                self._event.node.get_id()
+            )
+            self.logger.debug('Reporting activity: %s', activity)
+            self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
-
-    def report_activity(self, event: Event):
-        self.logger.debug('Reporting activity: %s', event.to_str())
-        self.clients.get('sns').publish_activity(event.to_str(), 'eu-west-1')
+        if self._event.has_command():
+            self.logger.debug('Reporting activity: %s', self._event.to_str())
+            self.clients.get('sns').publish_activity(
+                'SUCCESS' if self._event.is_successful() else "ERROR",
+                self._event.to_str(),
+                'eu-west-1'
+            )
 
 
     def _send_command(self, event_data: EventData, comment: str, commands: list, target_node: Node = None):
@@ -541,13 +548,8 @@ class LifecycleHandler(object):
         if len(triggers) < 1:
             raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
 
-        if event.is_autoscaling():
-            self.__get_model().report_autoscaling_activity(event)
-
-        if event.is_command():
-            self.__get_model().report_activity(event)
-
         if event.is_terminating():
+            # reverse triggers for terminating events
             triggers = triggers[::-1]
 
         self.__process(triggers, event)
@@ -658,8 +660,13 @@ class LifecycleHandler(object):
 
 
     def __is_event_successful(self, event_data: EventData) -> bool:
-        self.__get_logger().debug("Check event condition.")
-        return self.__get_event(event_data).is_successful()
+        status = self.__get_event(event_data).is_successful()
+        if status:
+            self.__get_logger().debug("Event was successful.")
+        else:
+            self.__get_logger().error("Event was not successful.")
+
+        return status
 
 
     def __wait_for_next_event(self, event_data: EventData):

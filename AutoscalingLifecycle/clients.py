@@ -236,7 +236,7 @@ class CustomWaiters(object):
                 "version": 2,
                 "waiters": {
                     name: {
-                        "delay": 10,
+                        "delay": 20,
                         "operation": "DescribeScalingActivities",
                         "maxAttempts": 6,
                         "acceptors": [
@@ -746,8 +746,8 @@ class SnsClient(BaseClient):
         self.publish(subject, message, region)
 
 
-    def publish_activity(self, action, region = "eu-central-1"):
-        subject = self.formatter.format("SUCCESS : Finished %s", [action])
+    def publish_activity(self, status, action, region = "eu-central-1"):
+        subject = self.formatter.format("%s : Finished %s", [status, action])
         message = self.formatter.to_str({
             'default': subject,
             'sms': subject,
