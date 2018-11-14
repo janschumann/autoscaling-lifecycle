@@ -342,6 +342,33 @@ class BaseClient(object):
         self.formatter = logging.get_formatter()
 
 
+class Ec2Client(BaseClient):
+    def find_instances_by_name(self, name) -> list:
+        response = self.client.describe_instances(
+            Filters=[
+                {
+                    'Name': 'tag:Name',
+                    'Values': [
+                        name,
+                    ]
+                },
+                {
+                    'Name': 'instance-state-name',
+                    'Values': [
+                        'running',
+                    ]
+                },
+            ]
+        )
+
+        instances = []
+        for reservation in response.get('Reservations', []):
+            for instance in reservation.get('Instances', []):
+                instances.append(instance)
+
+        return instances
+
+
 class AutoscalingClient(BaseClient):
 
     def set_transition(self, transition):
