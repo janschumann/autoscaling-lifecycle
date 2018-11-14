@@ -382,7 +382,7 @@ class AutoscalingClient(BaseClient):
         _ = self.client.complete_lifecycle_action(
             LifecycleHookName = hook_name,
             AutoScalingGroupName = group_name,
-            LifecycleActionToken = token,
+            #LifecycleActionToken = token,
             LifecycleActionResult = result,
             InstanceId = instance_id
         )
