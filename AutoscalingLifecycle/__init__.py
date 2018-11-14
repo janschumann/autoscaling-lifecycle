@@ -334,16 +334,7 @@ class Model(object):
         raise NotImplementedError()
 
 
-    def report(self):
-        if self._event.is_autoscaling():
-            activity = self.clients.get('autoscaling').get_activity(
-                self._event.get_autoscaling_group_name(),
-                self._event.is_launching(),
-                self._event.node.get_id()
-            )
-            self.logger.debug('Reporting activity: %s', activity)
-            self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
-
+    def report(self, force_report_autoscaling_activity: bool = False):
         if self._event.has_command():
             self.logger.debug('Reporting activity: %s', self._event.to_str())
             self.clients.get('sns').publish_activity(
@@ -351,6 +342,15 @@ class Model(object):
                 self._event.to_str(),
                 'eu-west-1'
             )
+
+        if force_report_autoscaling_activity or self._event.is_autoscaling():
+            activity = self.clients.get('autoscaling').get_activity(
+                self._event.get_autoscaling_group_name(),
+                self._event.is_launching(),
+                self._event.node.get_id()
+            )
+            self.logger.debug('Reporting activity: %s', activity)
+            self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
 
     def _send_command(self, event_data: EventData, comment: str, commands: list, target_node: Node = None):
@@ -420,7 +420,7 @@ class Model(object):
             _node.get_id()
         )
 
-        self.report()
+        self.report(True)
 
 
     def do_remove_from_db(self, event_data: EventData):
