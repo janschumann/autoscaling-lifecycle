@@ -4,7 +4,7 @@ import botocore.waiter as waiter
 from boltons.tbutils import ExceptionInfo
 from boto3 import Session
 from botocore.client import BaseClient as BotoClient
-from botocore.exceptions import WaiterError
+from botocore.exceptions import WaiterError, ValidationError
 
 from .logging import Logging
 from .logging import MessageFormatter
@@ -379,13 +379,16 @@ class AutoscalingClient(BaseClient):
 
     def complete_lifecycle_action(self, hook_name, group_name, token, result, instance_id):
         self.logger.debug('Completing lifecycle action for %s with %s', instance_id, result)
-        _ = self.client.complete_lifecycle_action(
-            LifecycleHookName = hook_name,
-            AutoScalingGroupName = group_name,
-            #LifecycleActionToken = token,
-            LifecycleActionResult = result,
-            InstanceId = instance_id
-        )
+        try:
+            _ = self.client.complete_lifecycle_action(
+                LifecycleHookName = hook_name,
+                AutoScalingGroupName = group_name,
+                LifecycleActionToken = token,
+                LifecycleActionResult = result,
+                InstanceId = instance_id
+            )
+        except ValidationError as e:
+            self.logger.exception("Failed to complete lifecycle action: %s", repr(e))
 
 
     def wait_for_instances_in_service(self, instance_ids):
@@ -456,7 +459,6 @@ class AutoscalingClient(BaseClient):
         except WaiterError:
             msg = 'Autoscaling: Error while waiting for autoscaling activity to complete: Activity not found for %s in %s'
             self.logger.exception(msg, instance_id, group)
-            raise
 
 
 class DynamoDbClient(BaseClient):
