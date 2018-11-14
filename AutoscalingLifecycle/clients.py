@@ -4,7 +4,7 @@ import botocore.waiter as waiter
 from boltons.tbutils import ExceptionInfo
 from boto3 import Session
 from botocore.client import BaseClient as BotoClient
-from botocore.exceptions import WaiterError, ValidationError
+from botocore.exceptions import WaiterError, ClientError
 
 from .logging import Logging
 from .logging import MessageFormatter
@@ -387,7 +387,7 @@ class AutoscalingClient(BaseClient):
                 LifecycleActionResult = result,
                 InstanceId = instance_id
             )
-        except ValidationError as e:
+        except ClientError as e:
             self.logger.exception("Failed to complete lifecycle action: %s", repr(e))
 
 
