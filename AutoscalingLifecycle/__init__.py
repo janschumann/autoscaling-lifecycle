@@ -366,7 +366,7 @@ class Model(object):
         _event = self.get_event(event_data)
         _node = _event.node
         self.logger.info('completing autoscaling action for node %s', _node.to_dict())
-        self.clients.get('autoscaling').do_complete_lifecycle_action(
+        self.clients.get('autoscaling').complete_lifecycle_action(
             _event.get_lifecycle_hook_name(),
             _event.get_autoscaling_group_name(),
             _event.get_lifecycle_action_token(),
