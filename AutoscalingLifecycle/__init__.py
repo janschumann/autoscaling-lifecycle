@@ -14,8 +14,6 @@ from .entity import Repository
 from .logging import Formatter
 from .logging import Logging
 from .logging import MessageFormatter
-from .logging import MessageFormatter
-from .logging import SnsHandler
 
 
 def listify(obj):
@@ -73,6 +71,15 @@ class Event(object):
             self._command = command_repository.get(self._event.get('detail').get('command-id'))
             command_repository.delete(self._event.get('detail').get('command-id'))
         self.node = node_repository.get(self.get_instance_id())
+
+
+    def to_str(self):
+        msg = '%s in group "%s" on instance "%s"' % (
+            self._event.get('detail-type'),
+            self.get_autoscaling_group_name(),
+            self.node.get_id()
+        )
+        return msg
 
 
     def get_event(self) -> dict:
@@ -187,6 +194,17 @@ class AutoscalingEvent(Event):
 
 
 class SsmEvent(Event):
+
+    def to_str(self):
+        action = 'launching' if self.is_launching() else 'terminating'
+        msg = '%s for "%s" while "%s" in group "%s" on instance "%s"' % (
+            self._event.get('detail-type'),
+            self._command.get('Comment'),
+            action,
+            self.get_autoscaling_group_name(),
+            self.node.get_id()
+        )
+        return msg
 
     def get_command_id(self):
         return self._event.get('detail').get('command-id')
@@ -313,6 +331,21 @@ class Model(object):
         raise NotImplementedError()
 
 
+    def report_autoscaling_activity(self, event: Event):
+        activity = self.clients.get('autoscaling').get_activity(
+            event.get_autoscaling_group_name(),
+            event.is_launching(),
+            event.node.get_id()
+        )
+        self.logger.debug('Reporting activity: %s', activity)
+        self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
+
+
+    def report_activity(self, event: Event):
+        self.logger.debug('Reporting activity: %s', event.to_str())
+        self.clients.get('sns').publish_activity(event.to_str(), 'eu-west-1')
+
+
     def _send_command(self, event_data: EventData, comment: str, commands: list, target_node: Node = None):
         _event = self.get_event(event_data)
         if target_node is None:
@@ -379,6 +412,8 @@ class Model(object):
             _event.is_launching(),
             _node.get_id()
         )
+
+        self.report_autoscaling_activity(_event)
 
 
     def do_remove_from_db(self, event_data: EventData):
@@ -506,14 +541,16 @@ class LifecycleHandler(object):
         if len(triggers) < 1:
             raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
 
-        self.report_autoscaling_activity(event)
+        if event.is_autoscaling():
+            self.__get_model().report_autoscaling_activity(event)
+
+        if event.is_command():
+            self.__get_model().report_activity(event)
 
         if event.is_terminating():
             triggers = triggers[::-1]
 
         self.__process(triggers, event)
-
-        self.report_autoscaling_activity(event)
 
         self.__get_logger().info('processing event %s complete', repr(event))
 
@@ -534,6 +571,11 @@ class LifecycleHandler(object):
                         # not correct due to incorrect doc comments. **kwargs is always of type tuple not dict
                         self.machine.dispatch(trigger, event = event)
                     except Exception as e:
+                        self.__get_clients().get('sns').publish_error(
+                            e,
+                            'launching' if event.is_launching() else 'terminating',
+                            'eu-west-1'
+                        )
                         if self._raise_on_operation_failure:
                             raise
 
@@ -571,7 +613,11 @@ class LifecycleHandler(object):
         except Exception as e:
             if self.__in_failure_handling:
                 self.__get_logger().exception("An error occured during failure handling.", repr(e))
-                self.__get_clients().get('sns').publish_error(e, 'complete', 'eu-west-1')
+                self.__get_clients().get('sns').publish_error(
+                    e,
+                    'failure handling while ' + 'launching' if event.is_launching() else 'terminating',
+                    'eu-west-1'
+                )
                 raise
 
             msg = "An error occurred during transition. %s. Entering failure handling."
@@ -585,16 +631,6 @@ class LifecycleHandler(object):
             else:
                 self.__process(triggers, event)
             return
-
-
-    def report_autoscaling_activity(self, event: Event):
-        activity = self.__get_clients().get('autoscaling').get_activity(
-            event.get_autoscaling_group_name(),
-            event.is_launching(),
-            event.node.get_id()
-        )
-        self.__get_logger().debug('Reporting activity: %s', activity)
-        self.__get_clients().get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
 
     #

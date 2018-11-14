@@ -746,8 +746,8 @@ class SnsClient(BaseClient):
         self.publish(subject, message, region)
 
 
-    def publish_activity(self, action, instance_id, region = "eu-central-1"):
-        subject = self.formatter.format("SUCCESS : Finished %s on %s", [action, instance_id])
+    def publish_activity(self, action, region = "eu-central-1"):
+        subject = self.formatter.format("SUCCESS : Finished %s", [action])
         message = self.formatter.to_str({
             'default': subject,
             'sms': subject,
