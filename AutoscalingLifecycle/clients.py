@@ -361,8 +361,6 @@ class Ec2Client(BaseClient):
             ]
         )
 
-        self.logger.debug('Found instance %s', response)
-
         instances = []
         for reservation in response.get('Reservations', []):
             for instance in reservation.get('Instances', []):
