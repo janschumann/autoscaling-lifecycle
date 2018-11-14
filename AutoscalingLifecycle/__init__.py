@@ -69,6 +69,9 @@ class Event(object):
         self._event = event
         if self.has_command():
             self._command = command_repository.get(self._event.get('detail').get('command-id'))
+            if self._command == { }:
+                raise RuntimeError('Could not load command.')
+
             command_repository.delete(self._event.get('detail').get('command-id'))
         self.node = node_repository.get(self.get_instance_id())
 
@@ -539,6 +542,12 @@ class LifecycleHandler(object):
 
     def __call__(self, message: dict):
         event = self.__get_model().load_event(message)
+
+        if event.is_launching() and event.is_autoscaling() and not event.node.is_new():
+            raise self.__get_formatter().get_error(RuntimeError, "Only new nodes can be launched.")
+
+        if event.is_terminating() and event.node.is_new():
+            raise self.__get_formatter().get_error(RuntimeError, "New nodes cannot terminate.")
 
         msg = 'processing event %s with data: (event)%s, (node)%s'
         self.__get_logger().info(msg, repr(event), event.get_event(), event.node.to_dict())
