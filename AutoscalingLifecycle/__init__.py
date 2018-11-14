@@ -406,13 +406,16 @@ class Model(object):
         _event = self.get_event(event_data)
         _node = _event.node
         self.logger.info('completing autoscaling action for node %s', _node.to_dict())
-        self.clients.get('autoscaling').complete_lifecycle_action(
-            _event.get_lifecycle_hook_name(),
-            _event.get_autoscaling_group_name(),
-            _event.get_lifecycle_action_token(),
-            _event.get_lifecycle_result(),
-            _node.get_id()
-        )
+        try:
+            self.clients.get('autoscaling').complete_lifecycle_action(
+                _event.get_lifecycle_hook_name(),
+                _event.get_autoscaling_group_name(),
+                _event.get_lifecycle_action_token(),
+                _event.get_lifecycle_result(),
+                _node.get_id()
+            )
+        except Exception as e:
+            self.logger.exception('failed to completete autoscaling action for node %s: %s', _node.to_dict(), repr(e))
 
         self.clients.get('autoscaling').wait_for_activity_to_complete(
             _event.get_autoscaling_group_name(),
