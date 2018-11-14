@@ -814,24 +814,27 @@ class SnsClient(BaseClient):
 
 class SsmClient(BaseClient):
 
-    def send_command(self, instance_id, comment, commands):
-        self.logger.debug('Sending command "%s" to instance %s: %s', comment, instance_id, commands)
+    def send_command(self, instance_ids, comment, commands):
+        if type(instance_ids) is not list:
+            instance_ids = [instance_ids]
+
+        self.logger.debug('Sending command "%s" to instance %s: %s', comment, instance_ids, commands)
 
         self.logger.debug('Waiting for ssm agent to become ready.')
         # can be replaced when https://github.com/boto/botocore/pull/1502 will be accepted
         # waiter = ssm.get_waiter['AgentIsOnline']
         self.waiters.get('AgentIsOnline').wait(
-            Filters = [{ 'Key': 'InstanceIds', 'Values': [instance_id] }]
+            Filters = [{ 'Key': 'InstanceIds', 'Values': instance_ids }]
         )
 
         command_id = self.client.send_command(
-            InstanceIds = [instance_id],
+            InstanceIds = instance_ids,
             DocumentName = 'AWS-RunShellScript',
             Comment = self.logger.name + ' : ' + comment,
             Parameters = {
                 'commands': commands
             }
         ).get('Command').get('CommandId')
-        self.logger.debug('Command "%s" on instance %s is running: %s', comment, instance_id, command_id)
+        self.logger.debug('Command "%s" on instance %s is running: %s', comment, instance_ids, command_id)
 
         return command_id
