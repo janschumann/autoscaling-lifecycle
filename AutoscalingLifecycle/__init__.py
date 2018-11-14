@@ -501,21 +501,19 @@ class LifecycleHandler(object):
         msg = 'processing event %s with data: (event)%s, (node)%s'
         self.__get_logger().info(msg, repr(event), event.get_event(), event.node.to_dict())
 
-        if event.is_launching() and event.is_autoscaling() and not event.node.is_new():
-            raise self.__get_formatter().get_error(RuntimeError, "Only new nodes can be launched.")
-
-        if event.is_terminating() and event.node.is_new():
-            raise self.__get_formatter().get_error(RuntimeError, "New nodes cannot terminate.")
-
         # fail early, if no triggers can be found for the state
         triggers = self.machine.get_triggers(self.__get_model().state)
         if len(triggers) < 1:
             raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
 
+        self.report_autoscaling_activity(event)
+
         if event.is_terminating():
             triggers = triggers[::-1]
 
         self.__process(triggers, event)
+
+        self.report_autoscaling_activity(event)
 
         self.__get_logger().info('processing event %s complete', repr(event))
 
@@ -573,6 +571,7 @@ class LifecycleHandler(object):
         except Exception as e:
             if self.__in_failure_handling:
                 self.__get_logger().exception("An error occured during failure handling.", repr(e))
+                self.__get_clients().get('sns').publish_error(e, 'complete', 'eu-west-1')
                 raise
 
             msg = "An error occurred during transition. %s. Entering failure handling."
@@ -586,6 +585,16 @@ class LifecycleHandler(object):
             else:
                 self.__process(triggers, event)
             return
+
+
+    def report_autoscaling_activity(self, event: Event):
+        activity = self.__get_clients().get('autoscaling').get_activity(
+            event.get_autoscaling_group_name(),
+            event.is_launching(),
+            event.node.get_id()
+        )
+        self.__get_logger().debug('Reporting activity: %s', activity)
+        self.__get_clients().get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
 
     #
