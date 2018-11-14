@@ -512,6 +512,9 @@ class LifecycleHandler(object):
         if len(triggers) < 1:
             raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
 
+        if event.is_terminating():
+            triggers = triggers[::-1]
+
         self.__process(triggers, event)
 
         self.__get_logger().info('processing event %s complete', repr(event))
