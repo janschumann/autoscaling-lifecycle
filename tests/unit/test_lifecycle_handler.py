@@ -31,7 +31,7 @@ class MockModel(Model):
     @transitions.setter
     def transitions(self, value):
         self.__transitions = value
-        self._seen_states = []
+        self.seen_states = []
 
 
 class MockDynamoDbClient(DynamoDbClient):
@@ -75,6 +75,55 @@ class TestLifecycleHandler(unittest.TestCase):
                 'triggers': [
                     {
                         'name': 'trigger_1',
+                    },
+                ]
+            },
+        ]
+
+
+    def get_stop_tansition_config(self):
+        return [
+            {
+                'source': 'pending',
+                'dest': 'destination',
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                        'stop_after_state_change': True
+                    },
+                ]
+            },
+            {
+                'source': 'destination',
+                'dest': 'unreachable',
+                'triggers': [
+                    {
+                        'name': 'trigger_2',
+                    },
+                ]
+            },
+        ]
+
+
+    def get_stop_tansition_with_error_config(self):
+        return [
+            {
+                'source': 'pending',
+                'dest': 'destination',
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                        'before': [self.trigger_raise_error],
+                        'stop_after_state_change': True,
+                    },
+                ]
+            },
+            {
+                'source': 'destination',
+                'dest': 'unreachable',
+                'triggers': [
+                    {
+                        'name': 'trigger_2',
                     },
                 ]
             },
@@ -395,7 +444,7 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'finish',
                         'after': [self.trigger_raise_error],
-                        'last': True
+                        'stop_after_state_change': True
                     }
                 ]
             },
@@ -458,13 +507,13 @@ class TestLifecycleHandler(unittest.TestCase):
             {
                 'source': ['rebalanced', 'terminating_complete'],
                 # a destination state of None will prevent the machine to update the state
-                'dest': None,
+                'dest': 'removed',
                 # 'after': [self.wait_for_next_event] causes the execution to stop: last operation
                 'triggers': [
                     {
                         'name': 'remove',
                         'before': [self.trigger_no_error],
-                        'last': True
+                        'stop_after_state_change': True
                     },
                 ]
             },
@@ -513,7 +562,7 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'graceful_remove',
                         'before': [self.trigger_raise_error],
-                        'last': True,
+                        'stop_after_state_change': True,
                         'ignore_errors': True
                     },
                 ]
@@ -559,23 +608,6 @@ class TestLifecycleHandler(unittest.TestCase):
         self.assertEqual(transition.after[0].__name__, '__log_after')
 
 
-    def test_last_transition_flag_is_accepted(self):
-        config = self.get_default_tansition_config()
-        config[0].get('triggers')[0].update({ 'last': True })
-
-        model = mock.Mock()
-        model.get_transitions.return_value = config
-
-        handler = LifecycleHandler(model)
-        triggers = handler.machine.get_triggers("source")
-        event = handler.machine.events.get(triggers[0])
-        transition = event.transitions.get('source')[0]
-
-        self.assertEqual(1, len(transition.prepare))
-        self.assertIsInstance(transition.prepare[0], types.MethodType)
-        self.assertEqual(transition.prepare[0].__name__, '__wait_for_next_event')
-
-
     def test_stop_after_state_change_flag_is_accepted(self):
         config = self.get_default_tansition_config()
         config[0].get('triggers')[0].update({ 'stop_after_state_change': True })
@@ -588,8 +620,8 @@ class TestLifecycleHandler(unittest.TestCase):
         event = handler.machine.events.get(triggers[0])
         transition = event.transitions.get('source')[0]
 
-        self.assertIsInstance(transition.after[0], types.MethodType)
-        self.assertEqual(transition.after[0].__name__, '__wait_for_next_event')
+        self.assertIsInstance(transition.after[-1], types.MethodType)
+        self.assertEqual(transition.after[-1].__name__, '__wait_for_next_event')
 
 
     def test_ignore_errors_flag_is_accepted(self):
@@ -674,3 +706,29 @@ class TestLifecycleHandler(unittest.TestCase):
 
         self.assertEqual(12, len(self.model.seen_states))
         self.assertEqual('gracefully_rebalancing', self.model.state)
+
+
+    def test_stop_transition(self):
+        self.model.transitions = self.get_stop_tansition_config()
+
+        fh = open('../fixtures/ssm_event.json', 'r')
+        message = json.load(fh)
+        fh.close()
+        handler = LifecycleHandler(self.model)
+        handler(message)
+
+        self.assertEqual(1, len(self.model.seen_states))
+        self.assertEqual('destination', self.model.state)
+
+
+    def test_stop_transition_with_error(self):
+        self.model.transitions = self.get_stop_tansition_with_error_config()
+
+        fh = open('../fixtures/ssm_event.json', 'r')
+        message = json.load(fh)
+        fh.close()
+        handler = LifecycleHandler(self.model)
+        handler(message)
+
+        self.assertEqual(1, len(self.model.seen_states))
+        self.assertEqual('failure', self.model.state)

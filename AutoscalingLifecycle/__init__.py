@@ -447,21 +447,32 @@ class TriggerParameterConfigurationError(ConfigurationError):
     pass
 
 
+class StopTriggerIteration(Exception):
+    """ Signal the end from LifecycleHandler.__process(). """
+    def get_message(self):
+        return self.args[0]
+
+
 class LifecycleHandler(object):
     """
     :type machine: Machine
-    :type __exception_count: int
-    :type stop: bool
-    :type _raise_on_operation_failure: bool
+    :type __in_failure_handling: bool
+    :type __raise_on_operation_failure: bool
     """
     machine_cls = Machine
     machine = None
     __in_failure_handling = False
-    __state_change_count = 0
-
-    _stop = None
-    _raise_on_operation_failure = None
-
+    __raise_on_operation_failure = True
+    __default_trigger = {
+        'name': 'default',
+        'prepare': [],
+        'conditions': [],
+        'unless': [],
+        'after': [],
+        'before': [],
+        'stop_after_state_change': False,
+        'ignore_errors': False
+    }
 
     #
     # initialization
@@ -488,50 +499,61 @@ class LifecycleHandler(object):
                     raise ConfigurationError(msg)
 
 
-    def __add_transition(self, sources, dest, trigger: dict):
+    def __add_transition(self, sources: list, dest: str, config: dict):
+        trigger = self.__default_trigger.copy()
+        trigger.update(config)
+
         # prepare functions will be executed first
-        prepare = trigger.get('prepare', [])
+        prepare = trigger.get('prepare')
         if type(prepare) is not list:
             raise TriggerParameterConfigurationError('prepare is not a list')
+        trigger.pop('prepare')
 
-        if trigger.get('ignore_errors', False):
+        ignore_errors = trigger.get('ignore_errors')
+        trigger.pop('ignore_errors')
+        if ignore_errors:
             # set ignore errors before any other function
             # so we set this as early as possible (in prepare)
             prepare = [self.__ignore_operation_failure] + prepare
 
-        if trigger.get('last', False):
-            # we need to stop after this operation
-            # so we set this as early as possible (in prepare)
-            prepare = prepare + [self.__wait_for_next_event]
-
-        # conditions are checked before transition functions
-        conditions = trigger.get('conditions', [])
+        conditions = trigger.get('conditions')
         if type(conditions) is not list:
             raise TriggerParameterConfigurationError('conditions is not a list')
-        if not trigger.get('ignore_errors', False):
+        trigger.pop('conditions')
+        if not ignore_errors:
             # require the event to be successful
             conditions = [self.__is_event_successful] + conditions
-        unless = trigger.get('unless', [])
+        unless = trigger.get('unless')
         if type(unless) is not list:
             raise TriggerParameterConfigurationError('unless is not a list')
+        trigger.pop('unless')
 
-        before = trigger.get('before', [])
+        before = trigger.get('before')
         if type(before) is not list:
             raise TriggerParameterConfigurationError('before is not a list')
+        trigger.pop('before')
         # log the event before any other transition function
         before = [self.__log_before] + before
 
-        after = trigger.get('after', [])
+        after = trigger.get('after')
         if type(after) is not list:
             raise TriggerParameterConfigurationError('after is not a list')
+        trigger.pop('after')
+        after = after + [self.__log_after]
         # set stop condition if needed
-        if trigger.get('stop_after_state_change', False):
+        stop_after_state_change = trigger.get('stop_after_state_change')
+        trigger.pop('stop_after_state_change')
+        if stop_after_state_change:
             after += [self.__wait_for_next_event]
-        # logging is last
-        after += after + [self.__log_after]
+
+        name = trigger.get('name')
+        trigger.pop('name')
+
+        if trigger != { }:
+            raise TriggerParameterConfigurationError('unknown options %s' % ", ".join(trigger.keys()))
 
         self.machine.add_transition(
-            trigger.get('name', 'default'),
+            name,
             sources,
             dest,
             prepare = prepare,
@@ -579,21 +601,24 @@ class LifecycleHandler(object):
                 self.__get_logger().debug('possible triggers for state %s: %s', state, triggers)
                 for trigger in triggers:
                     # reset trigger condition
-                    self._stop = False
-                    self._raise_on_operation_failure = True
+                    self.__raise_on_operation_failure = True
 
-                    self.__get_logger().info('pulling trigger %s on node %s', trigger, event.node.to_dict())
                     try:
+                        self.__get_logger().info('pulling trigger %s on node %s', trigger, event.node.to_dict())
                         # the ide shows an argument error event should be of type dict, which is
                         # not correct due to incorrect doc comments. **kwargs is always of type tuple not dict
                         self.machine.dispatch(trigger, event = event)
+                    except StopTriggerIteration as e:
+                        self.__get_logger().info(e.get_message())
+                        return
+
                     except Exception as e:
                         self.__get_clients().get('sns').publish_error(
                             e,
                             'launching' if event.is_launching() else 'terminating',
                             'eu-west-1'
                         )
-                        if self._raise_on_operation_failure:
+                        if self.__raise_on_operation_failure:
                             raise
 
                         self.__get_logger().exception('Ignoring failure %s in trigger %s.', repr(e), trigger)
@@ -601,7 +626,7 @@ class LifecycleHandler(object):
                         # we need to find the destination state and update the model,
                         # to be able to proceed with next triggers
                         # a destination state of None indicates an internal transition and the model
-                        # will not be updated
+                        # will not be updated and thus the iteration is stopped
                         transitions = self.machine.events.get(trigger).transitions.get(self.__get_model().state)
                         if transitions is not None and transitions[0].dest is not None:
                             msg = 'Trigger pulled before state change or error in conditions. Forcing state to %s'
@@ -610,17 +635,13 @@ class LifecycleHandler(object):
 
                     self.__get_logger().info('trigger %s complete', trigger)
 
-                    if self._stop:
-                        self.__get_logger().debug('trigger %s caused the loop to stop', trigger)
-                        return
-
                     if self.__get_model().state != state:
                         # the state change has been applied
-                        # proceed with next triggers
+                        # proceed with triggers for the updated state
                         break
 
                 if self.__get_model().state == state:
-                    # state has not changed after pulling all possible triggers
+                    # state has not changed after pulling all triggers
                     # stop processing
                     break
 
@@ -644,10 +665,9 @@ class LifecycleHandler(object):
             self.machine.model.state = 'failure'
             triggers = self.machine.get_triggers(self.__get_model().state)
             if len(triggers) < 1:
-                self.__get_logger().warning("No state failure found.")
+                self.__get_logger().warning("No triggers for state failure found.")
             else:
                 self.__process(triggers, event)
-            return
 
 
     #
@@ -686,13 +706,12 @@ class LifecycleHandler(object):
 
 
     def __wait_for_next_event(self, event_data: EventData):
-        self.__get_logger().debug("%s requires to wait for the next event.", repr(event_data))
-        self._stop = True
+        raise StopTriggerIteration("%s requires to wait for the next event.", repr(event_data))
 
 
     def __ignore_operation_failure(self, event_data: EventData):
         self.__get_logger().debug("%s requires to ignore exceptions.", repr(event_data))
-        self._raise_on_operation_failure = False
+        self.__raise_on_operation_failure = False
 
 
     def __log_autoscaling_activity(self, event_data: EventData):
