@@ -356,17 +356,23 @@ class Model(object):
             self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
 
-    def _send_command(self, event_data: EventData, comment: str, commands: list, target_node: Node = None):
+    def _send_command(self, event_data: EventData, comment: str, commands: list, target_nodes = None):
         _event = self.get_event(event_data)
-        if target_node is None:
-            target_node = _event.node
+        if target_nodes is not None:
+            target_nodes = listify(target_nodes)
+        else:
+            target_nodes = [_event.node]
+
+        target_node_ids = []
+        for node in target_nodes:
+            target_node_ids.append(node.get_id())
 
         metadata = _event.get_command_metadata()
-        metadata.update({ 'RunningOn': target_node.get_id() })
+        metadata.update({ 'RunningOn': ', '.join(target_node_ids) })
         metadata.update({ 'Comment': comment })
-        metadata.update({ 'Commands': ','.join(commands) })
+        metadata.update({ 'Commands': ', '.join(commands) })
 
-        command_id = self.clients.get('ssm').send_command(target_node.get_id(), comment, commands)
+        command_id = self.clients.get('ssm').send_command(target_node_ids, comment, commands)
         self.repositories.get('command').register(command_id, metadata)
 
 
