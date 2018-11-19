@@ -408,11 +408,16 @@ class Model(object):
     def do_complete_lifecycle_action(self, event_data: EventData):
         _event = self.get_event(event_data)
         _node = _event.node
+        _token = _event.get_lifecycle_action_token()
+        if _node.has_property('LifecycleActionToken'):
+            _token = _node.get_property('LifecycleActionToken')
+            self.get_node_repository().unset_property(_node, ['LifecycleActionToken'])
+
         self.logger.info('completing autoscaling action for node %s', _node.to_dict())
         self.clients.get('autoscaling').complete_lifecycle_action(
             _event.get_lifecycle_hook_name(),
             _event.get_autoscaling_group_name(),
-            _event.get_lifecycle_action_token(),
+            _token,
             _event.get_lifecycle_result(),
             _node.get_id()
         )

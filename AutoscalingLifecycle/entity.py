@@ -93,6 +93,10 @@ class Node(object):
         self.data.update({ 'ItemStatus': self.status })
 
 
+    def has_property(self, property):
+        return self.data.get(property, False) is not False
+
+
     def get_property(self, property, default = None):
         return self.data.get(property, default)
 
