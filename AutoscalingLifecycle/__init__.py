@@ -453,7 +453,7 @@ class StopIterationAfterTrigger(Exception):
         return self.args[0]
 
 
-class StopIterationAfterStateChange(Exception):
+class StopProcessingAfterStateChange(Exception):
     """ Signal the end from LifecycleHandler.__process(). """
     def get_message(self):
         return self.args[0]
@@ -505,11 +505,11 @@ class LifecycleHandler(object):
             stop_after_state_change = transition.pop('stop_after_state_change')
 
             if transition != { }:
-                raise TriggerParameterConfigurationError(
+                raise ConfigurationError(
                     'unknown options %s in transition config' % ", ".join(transition.keys()))
 
             if dest in self.machine.states.keys():
-                raise TriggerParameterConfigurationError(
+                raise ConfigurationError(
                     'Duplicate destination state %s. Multiple transitions with the same destination are not allowed.' % dest
                 )
 
@@ -640,7 +640,12 @@ class LifecycleHandler(object):
                         # not correct due to incorrect doc comments. **kwargs is always of type tuple not dict
                         self.machine.dispatch(trigger, event = event)
 
-                    except StopIterationAfterTrigger:
+                    except StopProcessingAfterStateChange as e:
+                        self.__get_logger().info(e.get_message())
+                        return
+
+                    except StopIterationAfterTrigger as e:
+                        self.__get_logger().info(e.get_message())
                         break
 
                     except Exception as e:
@@ -678,10 +683,6 @@ class LifecycleHandler(object):
 
                 # load new triggers from updated state
                 triggers = self.machine.get_triggers(self.__get_model().state)
-
-        except StopIterationAfterStateChange as e:
-            self.__get_logger().info(e.get_message())
-            return
 
         except Exception as e:
             if self.__in_failure_handling:
@@ -741,11 +742,11 @@ class LifecycleHandler(object):
 
 
     def __continue_with_next_state(self, event_data: EventData):
-        raise StopIterationAfterTrigger("%s forces to continue with next trigger.", repr(event_data))
+        raise StopIterationAfterTrigger("Trigger forces to continue with next trigger. %s" % repr(event_data))
 
 
     def __wait_for_next_event(self, event_data: EventData):
-        raise StopIterationAfterStateChange("%s requires to wait for the next event.", repr(event_data))
+        raise StopProcessingAfterStateChange("State requires to wait for the next event. %s" % repr(event_data))
 
 
     def __ignore_operation_failure(self, event_data: EventData):
