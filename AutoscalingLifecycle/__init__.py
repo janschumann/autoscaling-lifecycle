@@ -405,12 +405,6 @@ class Model(object):
         time.sleep(self.__cloud_init_delay)
 
 
-    def do_register(self, event_data: EventData):
-        _event = self.get_event(event_data)
-        _event.node.set_type(_event.get_metadata().get('type'))
-        self.repositories.get('node').put(_event.node)
-
-
     def do_complete_lifecycle_action(self, event_data: EventData):
         _event = self.get_event(event_data)
         _node = _event.node
