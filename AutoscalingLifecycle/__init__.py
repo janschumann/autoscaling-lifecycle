@@ -447,7 +447,13 @@ class TriggerParameterConfigurationError(ConfigurationError):
     pass
 
 
-class StopTriggerIteration(Exception):
+class StopIterationAfterTrigger(Exception):
+    """ Signal the end trigger from LifecycleHandler.__process(). """
+    def get_message(self):
+        return self.args[0]
+
+
+class StopIterationAfterStateChange(Exception):
     """ Signal the end from LifecycleHandler.__process(). """
     def get_message(self):
         return self.args[0]
@@ -470,9 +476,16 @@ class LifecycleHandler(object):
         'unless': [],
         'after': [],
         'before': [],
-        'stop_after_state_change': False,
+        'stop_after_trigger': False,
         'ignore_errors': False
     }
+    __default_transition = {
+        'source': [],
+        'dest': '',
+        'triggers': [],
+        'stop_after_state_change': False
+    }
+
 
     #
     # initialization
@@ -482,14 +495,35 @@ class LifecycleHandler(object):
         self.machine = self.machine_cls(model, auto_transitions = False, send_event = True, queued = False)
 
         self.__get_logger().debug('initializing transitions')
-        for transition in self.machine.model.get_transitions():
-            sources = listify(transition.get('source'))
-            dest = transition.get('dest')
+        for config in self.machine.model.get_transitions():
+            transition = self.__default_transition.copy()
+            transition.update(config)
 
-            self.machine.add_state(sources)
+            sources = listify(transition.pop('source'))
+            dest = transition.pop('dest')
+            triggers = transition.pop('triggers')
+            stop_after_state_change = transition.pop('stop_after_state_change')
+
+            if transition != { }:
+                raise TriggerParameterConfigurationError(
+                    'unknown options %s in transition config' % ", ".join(transition.keys()))
+
+            if dest in self.machine.states.keys():
+                raise TriggerParameterConfigurationError(
+                    'Duplicate destination state %s. Multiple transitions with the same destination are not allowed.' % dest
+                )
+
             self.machine.add_state(dest)
+            if stop_after_state_change and dest is not None:
+                state = self.machine.get_state(dest)
+                state.on_enter = [self.__wait_for_next_event]
 
-            for trigger in transition.get('triggers'):
+            states = self.machine.states.keys()
+            for state in sources:
+                if state not in states:
+                    self.machine.add_state(state)
+
+            for trigger in triggers:
                 try:
                     self.__add_transition(sources, dest, trigger)
                 except TriggerParameterConfigurationError as e:
@@ -541,16 +575,17 @@ class LifecycleHandler(object):
         trigger.pop('after')
         after = after + [self.__log_after]
         # set stop condition if needed
-        stop_after_state_change = trigger.get('stop_after_state_change')
-        trigger.pop('stop_after_state_change')
-        if stop_after_state_change:
-            after += [self.__wait_for_next_event]
+        stop_after_trigger = trigger.get('stop_after_trigger')
+        trigger.pop('stop_after_trigger')
+        if stop_after_trigger:
+            after += [self.__continue_with_next_state]
 
         name = trigger.get('name')
         trigger.pop('name')
 
         if trigger != { }:
-            raise TriggerParameterConfigurationError('unknown options %s' % ", ".join(trigger.keys()))
+            raise TriggerParameterConfigurationError(
+                'unknown options %s for trigger %s' % (", ".join(trigger.keys()), name))
 
         self.machine.add_transition(
             name,
@@ -580,14 +615,10 @@ class LifecycleHandler(object):
         msg = 'processing event %s with data: (event)%s, (node)%s'
         self.__get_logger().info(msg, repr(event), event.get_event(), event.node.to_dict())
 
-        # fail early, if no triggers can be found for the state
+        # fail early, if no triggers can be found for the current state
         triggers = self.machine.get_triggers(self.__get_model().state)
         if len(triggers) < 1:
             raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
-
-        if event.is_terminating():
-            # reverse triggers for terminating events
-            triggers = triggers[::-1]
 
         self.__process(triggers, event)
 
@@ -608,9 +639,9 @@ class LifecycleHandler(object):
                         # the ide shows an argument error event should be of type dict, which is
                         # not correct due to incorrect doc comments. **kwargs is always of type tuple not dict
                         self.machine.dispatch(trigger, event = event)
-                    except StopTriggerIteration as e:
-                        self.__get_logger().info(e.get_message())
-                        return
+
+                    except StopIterationAfterTrigger:
+                        break
 
                     except Exception as e:
                         self.__get_clients().get('sns').publish_error(
@@ -647,6 +678,10 @@ class LifecycleHandler(object):
 
                 # load new triggers from updated state
                 triggers = self.machine.get_triggers(self.__get_model().state)
+
+        except StopIterationAfterStateChange as e:
+            self.__get_logger().info(e.get_message())
+            return
 
         except Exception as e:
             if self.__in_failure_handling:
@@ -705,8 +740,12 @@ class LifecycleHandler(object):
         return status
 
 
+    def __continue_with_next_state(self, event_data: EventData):
+        raise StopIterationAfterTrigger("%s forces to continue with next trigger.", repr(event_data))
+
+
     def __wait_for_next_event(self, event_data: EventData):
-        raise StopTriggerIteration("%s requires to wait for the next event.", repr(event_data))
+        raise StopIterationAfterStateChange("%s requires to wait for the next event.", repr(event_data))
 
 
     def __ignore_operation_failure(self, event_data: EventData):

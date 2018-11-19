@@ -81,30 +81,6 @@ class TestLifecycleHandler(unittest.TestCase):
         ]
 
 
-    def get_stop_tansition_config(self):
-        return [
-            {
-                'source': 'pending',
-                'dest': 'destination',
-                'triggers': [
-                    {
-                        'name': 'trigger_1',
-                        'stop_after_state_change': True
-                    },
-                ]
-            },
-            {
-                'source': 'destination',
-                'dest': 'unreachable',
-                'triggers': [
-                    {
-                        'name': 'trigger_2',
-                    },
-                ]
-            },
-        ]
-
-
     def get_stop_tansition_with_error_config(self):
         return [
             {
@@ -114,7 +90,6 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'trigger_1',
                         'before': [self.trigger_raise_error],
-                        'stop_after_state_change': True,
                     },
                 ]
             },
@@ -257,7 +232,7 @@ class TestLifecycleHandler(unittest.TestCase):
             },
             {
                 'source': 'not_reachable',
-                'dest': 'last',
+                'dest': None,
                 'triggers': [
                     {
                         'name': 'no_op',
@@ -337,17 +312,6 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_docker_transitions(self):
         return [
             {
-                'source': 'failure',
-                'dest': 'forced_offline',
-                'triggers': [
-                    {
-                        'name': 'graceful_update_dns',
-                        'after': [self.trigger_no_error],
-                        'ignore_errors': True
-                    },
-                ]
-            },
-            {
                 'source': 'new',
                 'dest': 'pending',
                 # a single operation for all the nodes
@@ -373,13 +337,11 @@ class TestLifecycleHandler(unittest.TestCase):
                         'conditions': [self.true_condition],
                         'unless': [self.true_condition],
                         'before': [self.trigger_no_error],
-                        # 'stop_after_state_change': True
                     },
                     {
                         'name': 'join_cluster',
                         'conditions': [self.true_condition],
                         'before': [self.trigger_no_error],
-                        # 'stop_after_state_change': True
                     },
                 ]
             },
@@ -394,7 +356,6 @@ class TestLifecycleHandler(unittest.TestCase):
                         'name': 'add_labels',
                         'conditions': [self.true_condition],
                         'before': [self.trigger_no_error],
-                        # 'stop_after_state_change': True
                     }
                 ]
             },
@@ -431,7 +392,6 @@ class TestLifecycleHandler(unittest.TestCase):
                         'name': 'rebalance_services',
                         'conditions': [self.true_condition],
                         'before': [self.trigger_no_error],
-                        # 'stop_after_state_change': True
                     },
                 ]
             },
@@ -444,13 +404,12 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'finish',
                         'after': [self.trigger_raise_error],
-                        'stop_after_state_change': True
                     }
                 ]
             },
             {
                 # allow all launching states (except new) to this transition
-                'source': ['pending', 'abandoned', 'initializing', 'labeled', 'online', 'ready', 'running'],
+                'source': ['pending', 'abandoned', 'initializing', 'labeled', 'online', 'ready', 'complete', 'running'],
                 'dest': 'offline',
                 # remove the node from dns, which makes it unreachable for workloads
                 # this is considered offline
@@ -471,7 +430,6 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'remove_from_cluster',
                         'before': [self.trigger_no_error],
-                        # 'stop_after_state_change': True
                     }
                 ]
             },
@@ -500,7 +458,6 @@ class TestLifecycleHandler(unittest.TestCase):
                         'name': 'rebalance_services',
                         'conditions': [self.true_condition],
                         'before': [self.trigger_no_error],
-                        # 'stop_after_state_change': True
                     }
                 ]
             },
@@ -513,7 +470,17 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'remove',
                         'before': [self.trigger_no_error],
-                        'stop_after_state_change': True
+                    },
+                ]
+            },
+            {
+                'source': 'failure',
+                'dest': 'forced_offline',
+                'triggers': [
+                    {
+                        'name': 'graceful_update_dns',
+                        'after': [self.trigger_no_error],
+                        'ignore_errors': True
                     },
                 ]
             },
@@ -524,7 +491,6 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'graceful_remove_from_cluster',
                         'after': [self.trigger_raise_error],
-                        # 'stop_after_state_change': True,
                         'ignore_errors': True
                     },
                 ]
@@ -548,7 +514,6 @@ class TestLifecycleHandler(unittest.TestCase):
                         'name': 'graceful_rebalance',
                         'conditions': [self.true_condition],
                         'after': [self.trigger_raise_error],
-                        # 'stop_after_state_change': True,
                         'ignore_errors': True
                     },
                 ]
@@ -562,13 +527,281 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'graceful_remove',
                         'before': [self.trigger_raise_error],
-                        'stop_after_state_change': True,
                         'ignore_errors': True
                     },
                 ]
             }
         ]
 
+    def get_stop_after_state_change_transition_config(self):
+        return [
+            {
+                'source': 'pending',
+                'dest': 'destination',
+                'triggers': [
+                    {
+                        'name': 'trigger',
+                    },
+                ],
+            },
+            {
+                'source': ['pending', 'destination'],
+                'dest': 'last',
+                'triggers': [
+                    {
+                        'name': 'trigger2',
+                    }
+                ],
+                'stop_after_state_change': True
+            },
+            {
+                'source': 'last',
+                'dest': 'unreachable',
+                'triggers': [
+                    {
+                        'name': 'not_called',
+                    }
+                ],
+            },
+        ]
+
+    def get_validate_transitions(self):
+        model = mock.Mock()
+        return [
+            {
+                'source': 'new',
+                'dest': 'pending',
+                'triggers': [
+                    {
+                        'name': 'register',
+                        'before': [model.do_register],
+                    }
+                ]
+            },
+            {
+                'source': 'pending',
+                'dest': 'initializing',
+                'triggers': [
+                    {
+                        'name': 'initialize_cluster',
+                        'conditions': [model.is_manager],
+                        'unless': [model.has_initialized_manager],
+                        'before': [model.do_wait_for_cloud_init, model.do_initialize],
+                    },
+                    {
+                        'name': 'join_cluster',
+                        'conditions': [model.is_worker],
+                        'before': [model.do_wait_for_cloud_init, model.do_wait_for_manager, model.do_join],
+                    },
+                ]
+            },
+            {
+                'source': 'initializing',
+                'dest': 'initialized',
+                'triggers': [
+                    {
+                        'name': 'add_labels',
+                        'conditions': [model.is_worker],
+                        'before': [model.do_add_labels],
+                    }
+                ]
+            },
+            {
+                # manager will skip state initialized, so we also allow initializing as source state
+                'source': ['initializing', 'initialized'],
+                'dest': 'online',
+                'triggers': [
+                    {
+                        'name': 'add_node_to_dns',
+                        'before': [model.do_update_swarm_dns],
+                    }
+                ]
+            },
+            {
+                'source': 'online',
+                'dest': 'ready',
+                'triggers': [
+                    {
+                        'name': 'complete_launch',
+                        'before': [model.do_complete_lifecycle_action],
+                    }
+                ]
+            },
+            {
+                'source': 'ready',
+                'dest': 'update_varnish',
+                'triggers': [
+                    {
+                        'name': 'update_varnish_backends',
+                        'conditions': [model.is_worker, model.has_varnish_instances],
+                        'before': [model.do_reload_varnish_backends],
+                    },
+                ]
+            },
+            {
+                'source': 'update_varnish',
+                'dest': 'update_services',
+                # 'after': [self.wait_for_next_event] causes the execution to stop: last operation
+                'triggers': [
+                    {
+                        'name': 'update_services',
+                        'conditions': [model.is_worker],
+                        'before': [model.do_rebalance_services],
+                    },
+                ]
+            },
+            {
+                'source': ['ready', 'update_varnish', 'update_services'],
+                'dest': 'running',
+                'triggers': [
+                    # a null operation to let also manager transition to running
+                    {
+                        'name': 'finish',
+                    }
+                ],
+                'stop_after_state_change': True
+            },
+            {
+                # allow all launching states except new to this transition
+                'source': ['pending', 'initializing', 'initialized', 'online', 'ready', 'update_varnish', 'update_services', 'running'],
+                'dest': 'reduce_varnish',
+                'triggers': [
+                    {
+                        'name': 'remove_node_from_dns',
+                        # update dns AFTER state change, so that terminating nodes cannot be considered
+                        # while updating records
+                        'after': [model.do_update_swarm_dns],
+                    }
+                ]
+            },
+            {
+                'source': 'reduce_varnish',
+                'dest': 'offline',
+                'triggers': [
+                    {
+                        'name': 'reduce_varnish_backends',
+                        'conditions': [model.is_worker, model.has_varnish_instances],
+                        'before': [model.do_reload_varnish_backends],
+                    },
+                ]
+            },
+            {
+                'source': ['reduce_varnish', 'offline'],
+                'dest': 'removed_form_cluster',
+                'triggers': [
+                    {
+                        'name': 'remove_from_cluster',
+                        'before': [model.do_remove_from_cluster],
+                    }
+                ]
+            },
+            {
+                'source': 'removed_form_cluster',
+                'dest': 'lifecycle_complete',
+                'triggers': [
+                    {
+                        'name': 'terminate_complete',
+                        'after': [model.do_complete_lifecycle_action]
+                    },
+                ]
+            },
+            {
+                'source': 'lifecycle_complete',
+                'dest': 'reduce_services',
+                'triggers': [
+                    {
+                        'name': 'reduce_services',
+                        'conditions': [model.is_worker],
+                        'before': [model.do_rebalance_services],
+                    }
+                ]
+            },
+            {
+                'source': ['lifecycle_complete', 'reduce_services'],
+                # a destination state of None will prevent the machine to update the state
+                # which would lead to an error, as the node does not exist anymore
+                'dest': None,
+                'triggers': [
+                    {
+                        'name': 'remove',
+                        'before': [model.do_remove_from_db],
+                    },
+                ]
+            },
+            {
+                # enter failure handling
+                'source': 'failure',
+                'dest': 'failure_reduce_varnish',
+                'triggers': [
+                    {
+                        'name': 'gracefully_remove_node_from_dns',
+                        # update dns AFTER state change, so that terminating nodes cannot be considered
+                        # while updating records
+                        'after': [model.do_update_swarm_dns],
+                        'ignore_errors': True,
+                    }
+                ]
+            },
+            {
+                'source': 'failure_reduce_varnish',
+                'dest': 'failure_offline',
+                'triggers': [
+                    {
+                        'name': 'gracefully_reduce_varnish_backends',
+                        'conditions': [model.is_worker, model.has_varnish_instances],
+                        'before': [model.do_reload_varnish_backends],
+                        'ignore_errors': True,
+                    },
+                ]
+            },
+            {
+                'source': ['failure_reduce_varnish', 'failure_offline'],
+                'dest': 'failure_removed_form_cluster',
+                'triggers': [
+                    {
+                        'name': 'gracefully_remove_from_cluster',
+                        'before': [model.do_remove_from_cluster],
+                        'ignore_errors': True,
+                    }
+                ]
+            },
+            {
+                'source': 'failure_removed_form_cluster',
+                'dest': 'failure_lifecycle_complete',
+                'triggers': [
+                    {
+                        'name': 'gracefully_terminate_complete',
+                        'after': [model.do_complete_lifecycle_action],
+                        'ignore_errors': True,
+                    },
+                ]
+            },
+            {
+                'source': 'failure_lifecycle_complete',
+                'dest': 'failure_update_services',
+                'triggers': [
+                    {
+                        'name': 'gracefully_update_services',
+                        'conditions': [model.is_worker],
+                        'before': [model.do_rebalance_services],
+                        'ignore_errors': True,
+                    }
+                ]
+            },
+            {
+                'source': ['failure_lifecycle_complete', 'failure_update_services'],
+                # a destination state of None will prevent the machine to update the state
+                # which would lead to an error, as the node does not exist anymore
+                'dest': None,
+                'triggers': [
+                    {
+                        'name': 'gracefully_remove',
+                        'before': [model.do_remove_from_db],
+                        'ignore_errors': True,
+                    },
+                ]
+            },
+        ]
 
     def trigger_raise_error(self, *args, **kwargs):
         raise RuntimeError("error in trigger method")
@@ -608,9 +841,9 @@ class TestLifecycleHandler(unittest.TestCase):
         self.assertEqual(transition.after[0].__name__, '__log_after')
 
 
-    def test_stop_after_state_change_flag_is_accepted(self):
+    def test_stop_after_trigger_flag_is_accepted(self):
         config = self.get_default_tansition_config()
-        config[0].get('triggers')[0].update({ 'stop_after_state_change': True })
+        config[0].get('triggers')[0].update({ 'stop_after_trigger': True })
 
         model = mock.Mock()
         model.get_transitions.return_value = config
@@ -621,7 +854,20 @@ class TestLifecycleHandler(unittest.TestCase):
         transition = event.transitions.get('source')[0]
 
         self.assertIsInstance(transition.after[-1], types.MethodType)
-        self.assertEqual(transition.after[-1].__name__, '__wait_for_next_event')
+        self.assertEqual(transition.after[-1].__name__, '__continue_with_next_state')
+
+    def test_stop_after_state_change_flag_is_accepted(self):
+        config = self.get_default_tansition_config()
+        config[0].update({ 'stop_after_state_change': True })
+
+        model = mock.Mock()
+        model.get_transitions.return_value = config
+
+        handler = LifecycleHandler(model)
+        state = handler.machine.get_state('destination')
+
+        self.assertIsInstance(state.on_enter[0], types.MethodType)
+        self.assertEqual(state.on_enter[0].__name__, '__wait_for_next_event')
 
 
     def test_ignore_errors_flag_is_accepted(self):
@@ -708,8 +954,8 @@ class TestLifecycleHandler(unittest.TestCase):
         self.assertEqual('gracefully_rebalancing', self.model.state)
 
 
-    def test_stop_transition(self):
-        self.model.transitions = self.get_stop_tansition_config()
+    def test_stop_transition_after_state_change(self):
+        self.model.transitions = self.get_stop_after_state_change_transition_config()
 
         fh = open('../fixtures/ssm_event.json', 'r')
         message = json.load(fh)
@@ -717,8 +963,8 @@ class TestLifecycleHandler(unittest.TestCase):
         handler = LifecycleHandler(self.model)
         handler(message)
 
-        self.assertEqual(1, len(self.model.seen_states))
-        self.assertEqual('destination', self.model.state)
+        self.assertEqual(2, len(self.model.seen_states))
+        self.assertEqual('last', self.model.state)
 
 
     def test_stop_transition_with_error(self):
@@ -732,3 +978,10 @@ class TestLifecycleHandler(unittest.TestCase):
 
         self.assertEqual(1, len(self.model.seen_states))
         self.assertEqual('failure', self.model.state)
+
+
+    def test_validation(self):
+        self.model.transitions = self.get_validate_transitions()
+        handler = LifecycleHandler(self.model)
+
+        self.assertEqual(21, len(handler.machine.states.keys()))
