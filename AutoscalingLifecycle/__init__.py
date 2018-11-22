@@ -50,6 +50,8 @@ class Event(object):
 
     node = None
 
+    has_failure = False
+
 
     @staticmethod
     def from_sns_message(message: dict, node_repository: NodeRepository, command_repository: CommandRepository):
@@ -130,7 +132,7 @@ class Event(object):
 
 
     def get_lifecycle_result(self) -> str:
-        if self.is_terminating():
+        if self.is_terminating() and not self.has_failure:
             return self._CONTINUE
 
         return self._ABANDON
@@ -158,6 +160,10 @@ class Event(object):
 
     def get_metadata(self) -> dict:
         raise NotImplementedError()
+
+
+    def set_has_failure(self):
+        self.has_failure = True
 
 
 class AutoscalingEvent(Event):
@@ -215,7 +221,7 @@ class SsmEvent(Event):
 
 
     def get_lifecycle_result(self) -> str:
-        if self.is_terminating() or self.is_successful():
+        if not self.has_failure and (self.is_terminating() or self.is_successful()):
             return self._CONTINUE
 
         return self._ABANDON
@@ -702,6 +708,7 @@ class LifecycleHandler(object):
             msg = "An error occurred during transition. %s. Entering failure handling."
             self.__get_logger().exception(msg, repr(e))
             self.__in_failure_handling = True
+            event.set_has_failure()
 
             self.machine.model.state = 'failure'
             triggers = self.machine.get_triggers(self.__get_model().state)
