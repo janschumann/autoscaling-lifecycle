@@ -727,10 +727,10 @@ class Route53Client(BaseClient):
         self.dns_change_set = []
 
 
-    def add_dns_change_set(self, name: str, records: list, ttl: int):
+    def add_dns_change_set(self, name: str, records: list, ttl: int, action: str = 'UPSERT'):
         self.logger.info('Add dns entry %s with %s to change set.', name, records)
         self.dns_change_set.append({
-            'Action': 'UPSERT',
+            'Action': action,
             'ResourceRecordSet': {
                 'Name': name,
                 'Type': 'A',
