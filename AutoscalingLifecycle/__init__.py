@@ -484,6 +484,9 @@ class LifecycleHandler(object):
         'triggers': [],
         'stop_after_state_change': False
     }
+    __illegal_trigger_names = [
+        'trigger'
+    ]
 
 
     #
@@ -536,6 +539,12 @@ class LifecycleHandler(object):
         trigger = self.__default_trigger.copy()
         trigger.update(config)
 
+        name = trigger.get('name')
+        trigger.pop('name')
+
+        if name in self.__illegal_trigger_names:
+            raise ConfigurationError('trigger name %s is not allowed' % name)
+
         # prepare functions will be executed first
         prepare = trigger.get('prepare')
         if type(prepare) is not list:
@@ -578,9 +587,6 @@ class LifecycleHandler(object):
         trigger.pop('stop_after_trigger')
         if stop_after_trigger:
             after += [self.__continue_with_next_state]
-
-        name = trigger.get('name')
-        trigger.pop('name')
 
         if trigger != { }:
             raise TriggerParameterConfigurationError(

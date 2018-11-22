@@ -1,5 +1,5 @@
 boto3>=1.7.5
 botocore>=1.10.55
 boltons>=18.0.1,<19.0.0
-transitions>=0.6.8
+transitions>=0.6.9
 mock==1.3.0

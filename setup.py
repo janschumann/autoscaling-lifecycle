@@ -3,11 +3,11 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-requires = ['boltons>=18.0.1,<19.0.0', 'transitions>=0.6.8']
+requires = ['boltons>=18.0.1,<19.0.0', 'transitions>=0.6.9']
 
 setuptools.setup(
     name = "AutoscalingLifecycle",
-    version = "0.45.0",
+    version = "0.46.0",
     author = "Jan Schumann",
     author_email = "js@schumann-it.com",
     description = "A library to handle aws autoscaling lifecycle events",

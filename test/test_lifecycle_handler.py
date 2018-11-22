@@ -1,17 +1,25 @@
 import json
+import os
 import types
 import unittest
+from logging import INFO
+from logging import StreamHandler
 from unittest import mock
 
 from transitions.core import Condition
 
 from AutoscalingLifecycle import LifecycleHandler
 from AutoscalingLifecycle import Model
+from AutoscalingLifecycle import ConfigurationError
 from AutoscalingLifecycle.clients import DynamoDbClient
 from AutoscalingLifecycle.entity import CommandRepository
 from AutoscalingLifecycle.entity import NodeRepository
 from AutoscalingLifecycle.entity import Repositories
 from AutoscalingLifecycle.logging import Logging
+
+
+def get_fixture(name):
+    return open(os.path.dirname(os.path.abspath(__file__)) + '/fixtures/' + name, 'r')
 
 
 class MockModel(Model):
@@ -37,7 +45,7 @@ class MockModel(Model):
 class MockDynamoDbClient(DynamoDbClient):
     def get_item(self, id):
         try:
-            fh = open('../fixtures/' + id + '.json', 'r')
+            fh = get_fixture(id + '.json')
             data = json.load(fh)
             fh.close()
         except Exception:
@@ -55,9 +63,9 @@ class TestLifecycleHandler(unittest.TestCase):
 
     def setUp(self):
         logging = Logging("TEST", True)
-        # h = StreamHandler()
-        # h.setLevel(INFO)
-        # logging.add_handler(h, "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
+        #h = StreamHandler()
+        #h.setLevel(INFO)
+        #logging.add_handler(h, "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
 
         client = MockDynamoDbClient(mock.Mock(), mock.Mock(), logging, 'table')
         repositories = Repositories(client, logging.get_logger())
@@ -75,6 +83,20 @@ class TestLifecycleHandler(unittest.TestCase):
                 'triggers': [
                     {
                         'name': 'trigger_1',
+                    },
+                ]
+            },
+        ]
+
+
+    def get_illegal_trigger_name_tansition_config(self):
+        return [
+            {
+                'source': 'source',
+                'dest': 'destination',
+                'triggers': [
+                    {
+                        'name': 'trigger',
                     },
                 ]
             },
@@ -256,7 +278,7 @@ class TestLifecycleHandler(unittest.TestCase):
                 'dest': 'last',
                 'triggers': [
                     {
-                        'name': 'trigger',
+                        'name': 'failure_trigger',
                         'before': [self.trigger_no_error],
                     },
 
@@ -533,6 +555,7 @@ class TestLifecycleHandler(unittest.TestCase):
             }
         ]
 
+
     def get_stop_after_state_change_transition_config(self):
         return [
             {
@@ -540,7 +563,7 @@ class TestLifecycleHandler(unittest.TestCase):
                 'dest': 'destination',
                 'triggers': [
                     {
-                        'name': 'trigger',
+                        'name': 'trigger_1',
                     },
                 ],
             },
@@ -549,7 +572,7 @@ class TestLifecycleHandler(unittest.TestCase):
                 'dest': 'last',
                 'triggers': [
                     {
-                        'name': 'trigger2',
+                        'name': 'trigger_2',
                     }
                 ],
                 'stop_after_state_change': True
@@ -564,6 +587,7 @@ class TestLifecycleHandler(unittest.TestCase):
                 ],
             },
         ]
+
 
     def get_validate_transitions(self):
         model = mock.Mock()
@@ -663,7 +687,8 @@ class TestLifecycleHandler(unittest.TestCase):
             },
             {
                 # allow all launching states except new to this transition
-                'source': ['pending', 'initializing', 'initialized', 'online', 'ready', 'update_varnish', 'update_services', 'running'],
+                'source': ['pending', 'initializing', 'initialized', 'online', 'ready', 'update_varnish',
+                           'update_services', 'running'],
                 'dest': 'reduce_varnish',
                 'triggers': [
                     {
@@ -803,6 +828,7 @@ class TestLifecycleHandler(unittest.TestCase):
             },
         ]
 
+
     def trigger_raise_error(self, *args, **kwargs):
         raise RuntimeError("error in trigger method")
 
@@ -856,6 +882,7 @@ class TestLifecycleHandler(unittest.TestCase):
         self.assertIsInstance(transition.after[-1], types.MethodType)
         self.assertEqual(transition.after[-1].__name__, '__continue_with_next_state')
 
+
     def test_stop_after_state_change_flag_is_accepted(self):
         config = self.get_default_tansition_config()
         config[0].update({ 'stop_after_state_change': True })
@@ -889,7 +916,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_ignore_errors_behavior(self):
         self.model.transitions = self.get_handle_ignore_errors_transition_config()
 
-        fh = open('../fixtures/ssm_event.json', 'r')
+        fh = get_fixture('ssm_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -902,7 +929,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_failure_behavior(self):
         self.model.transitions = self.get_handle_failure_transition_config()
 
-        fh = open('../fixtures/ssm_event.json', 'r')
+        fh = get_fixture('ssm_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -915,7 +942,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_failure_in_failure_handling_behavior(self):
         self.model.transitions = self.get_handle_failure_in_failure_transition_config()
 
-        fh = open('../fixtures/ssm_event.json', 'r')
+        fh = get_fixture('ssm_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -931,7 +958,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_conditions_behavior(self):
         self.model.transitions = self.get_handle_conditions_transition_config()
 
-        fh = open('../fixtures/ssm_event.json', 'r')
+        fh = get_fixture('ssm_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -944,7 +971,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_docker_transitions_for_new_node(self):
         self.model.transitions = self.get_docker_transitions()
 
-        fh = open('../fixtures/autoscaling_event.json', 'r')
+        fh = get_fixture('autoscaling_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -957,7 +984,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_stop_transition_after_state_change(self):
         self.model.transitions = self.get_stop_after_state_change_transition_config()
 
-        fh = open('../fixtures/ssm_event.json', 'r')
+        fh = get_fixture('ssm_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -970,7 +997,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def test_stop_transition_with_error(self):
         self.model.transitions = self.get_stop_tansition_with_error_config()
 
-        fh = open('../fixtures/ssm_event.json', 'r')
+        fh = get_fixture('ssm_event.json')
         message = json.load(fh)
         fh.close()
         handler = LifecycleHandler(self.model)
@@ -985,3 +1012,16 @@ class TestLifecycleHandler(unittest.TestCase):
         handler = LifecycleHandler(self.model)
 
         self.assertEqual(21, len(handler.machine.states.keys()))
+
+
+    def test_illegal_trigger_name_raises(self):
+        config = self.get_default_tansition_config()
+        config[0].get('triggers')[0].update({ 'name': 'trigger' })
+
+        model = mock.Mock()
+        model.get_transitions.return_value = config
+
+        with self.assertRaises(ConfigurationError) as context:
+            _ = LifecycleHandler(model)
+            self.assertTrue('trigger name trigger is not allowed' in context.exception)
+
