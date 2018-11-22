@@ -736,6 +736,7 @@ class LifecycleHandler(object):
                 self.__get_logger().debug("Command was successful.")
             else:
                 self.__get_logger().error("Command was not successful.")
+                raise RuntimeError("Command was not successful.")
 
         return status
 
