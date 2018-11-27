@@ -428,11 +428,12 @@ class Model(object):
             _node.get_id()
         )
 
-        self.clients.get('autoscaling').wait_for_activity_to_complete(
-            _event.get_autoscaling_group_name(),
-            _event.is_launching(),
-            _node.get_id()
-        )
+        if _event.is_launching():
+            self.clients.get('autoscaling').wait_for_activity_to_complete(
+                _event.get_autoscaling_group_name(),
+                _event.is_launching(),
+                _node.get_id()
+            )
 
         self.report(True)
 
@@ -629,7 +630,7 @@ class LifecycleHandler(object):
         # fail early, if no triggers can be found for the current state
         triggers = self.machine.get_triggers(self.__get_model().state)
         if len(triggers) < 1:
-            raise RuntimeError('no trigger could be found for %s', self.__get_model().state)
+            raise RuntimeError('no trigger could be found for %s' % self.__get_model().state)
 
         self.__process(triggers, event)
 
