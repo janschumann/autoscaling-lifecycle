@@ -362,7 +362,7 @@ class Model(object):
             self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
 
-    def _send_command(self, event_data: EventData, comment: str, commands: list, target_nodes = None):
+    def _send_command(self, event_data: EventData, comment: str, commands: list, target_nodes = None, command_timeout = 60):
         _event = self.get_event(event_data)
         if target_nodes is not None:
             target_nodes = listify(target_nodes)
@@ -378,7 +378,7 @@ class Model(object):
         metadata.update({ 'Comment': comment })
         metadata.update({ 'Commands': ', '.join(commands) })
 
-        command_id = self.clients.get('ssm').send_command(target_node_ids, comment, commands)
+        command_id = self.clients.get('ssm').send_command(target_node_ids, comment, commands, command_timeout)
         self.repositories.get('command').register(command_id, metadata)
 
 

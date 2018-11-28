@@ -814,7 +814,7 @@ class SnsClient(BaseClient):
 
 class SsmClient(BaseClient):
 
-    def send_command(self, instance_ids, comment, commands):
+    def send_command(self, instance_ids, comment, commands, timeout_in_seconds = 60):
         if type(instance_ids) is not list:
             instance_ids = [instance_ids]
 
@@ -833,7 +833,8 @@ class SsmClient(BaseClient):
             Comment = self.logger.name + ' : ' + comment,
             Parameters = {
                 'commands': commands
-            }
+            },
+            TimeoutSeconds = timeout_in_seconds
         ).get('Command').get('CommandId')
         self.logger.debug('Command "%s" on instance %s is running: %s', comment, instance_ids, command_id)
 
