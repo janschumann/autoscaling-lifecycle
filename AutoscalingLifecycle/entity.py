@@ -125,7 +125,7 @@ class Node(object):
 
 
     def is_new(self) -> bool:
-        return self.status == 'new'
+        return self.status == 'new' or self.status == 'pending' or self.status == 'finished_cloud_init'
 
 
     def set_id(self, ident):
