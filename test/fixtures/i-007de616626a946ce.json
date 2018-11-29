@@ -3,12 +3,12 @@
     "EC2InstanceId": "i-007de616626a946ce",
     "Ident": "i-007de616626a946ce",
     "InstanceIp": "10.3.5.44",
-    "ItemStatus": "pending",
+    "ItemStatus": "finished_cloud_init",
     "ItemType": "worker",
     "ManagerToken": "SWMTKN-1-612hack5w4pm6g04789gfot1pv6ydc4dhkbxhge411t702sx1n-bdjiivrsj5bss92qq0h7uhg35",
     "WorkerToken": "SWMTKN-1-612hack5w4pm6g04789gfot1pv6ydc4dhkbxhge411t702sx1n-dzsd2io48p2nff8ijv9q8o911"
   },
   "id": "i-007de616626a946ce",
-  "status": "pending",
+  "status": "finished_cloud_init",
   "type": "worker"
 }

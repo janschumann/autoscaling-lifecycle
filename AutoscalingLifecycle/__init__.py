@@ -54,28 +54,21 @@ class Event(object):
 
 
     @staticmethod
-    def from_sns_message(message: dict, node_repository: NodeRepository, command_repository: CommandRepository):
+    def from_sns_message(message: dict):
         event = json.loads(message.get('Records')[0].get('Sns').get('Message'))
 
         if event.get('source') == 'aws.autoscaling':
-            return AutoscalingEvent(event, node_repository, command_repository)
+            return AutoscalingEvent(event)
 
         elif event.get('source') == 'aws.ssm':
-            return SsmEvent(event, node_repository, command_repository)
+            return SsmEvent(event)
 
         else:
             raise RuntimeError('Unkonwn event %s', event.get('source'))
 
 
-    def __init__(self, event: dict, node_repository: NodeRepository, command_repository: CommandRepository):
+    def __init__(self, event: dict):
         self._event = event
-        if self.has_command():
-            self._command = command_repository.get(self._event.get('detail').get('command-id'))
-            if self._command == { }:
-                raise RuntimeError('Could not load command.')
-
-            command_repository.delete(self._event.get('detail').get('command-id'))
-        self.node = node_repository.get(self.get_instance_id())
 
 
     def to_str(self):
@@ -87,8 +80,12 @@ class Event(object):
         return msg
 
 
-    def get_event(self) -> dict:
+    def get_raw_event(self) -> dict:
         return self._event
+
+
+    def get_event(self) -> dict:
+        return self.get_raw_event()
 
 
     def get_command_metadata(self) -> dict:
@@ -109,6 +106,14 @@ class Event(object):
 
     def has_command(self) -> bool:
         return self.get_source() == self.__COMMAND
+
+
+    def set_command(self, command: dict):
+        self._command = command
+
+
+    def gez_command(self) -> dict:
+        return self._command
 
 
     def is_successful(self) -> bool:
@@ -168,8 +173,8 @@ class Event(object):
 
 class AutoscalingEvent(Event):
 
-    def __init__(self, event: dict, node_repository: NodeRepository, command_repository: CommandRepository):
-        super().__init__(event, node_repository, command_repository)
+    def __init__(self, event: dict):
+        super().__init__(event)
 
         metadata = self._event.get('detail').get('NotificationMetadata')
         if type(metadata) is not dict:
@@ -289,8 +294,6 @@ class Model(object):
     _state = None
     seen_states = []
 
-    __cloud_init_delay = 45
-
     EVENT = 'event'
     NODE = 'node'
     COMMAND = 'command'
@@ -304,15 +307,43 @@ class Model(object):
 
 
     def load_event(self, message) -> Event:
-        self._event = Event.from_sns_message(message, self.get_node_repository(), self.get_command_repository())
+        self._event = Event.from_sns_message(message)
+        if self._event.has_command():
+            command_id = self._event.get_raw_event().get('detail').get('command-id')
+            command = self.get_command_repository().get(command_id)
+            if command == { }:
+                raise RuntimeError('Could not load command %s.' % command_id)
+            self.get_command_repository().delete(command_id)
+            self._event.set_command(command)
+
         # set the initial state
+        self._event.node = self.get_node_repository().get(self._event.get_instance_id())
         self._state = self._event.node.get_state()
+        if self._event.node.is_new():
+            self._wait_for_cloud_init()
+
         # reset seen states
         self.seen_states = []
 
         self.report()
 
-        return self.event
+        return self._event
+
+
+    def _wait_for_cloud_init(self):
+        self.logger.debug("Waiting for node to be registered and cloud init to finish ...")
+        node = self._event.node
+        d = self.clients.get('dynamodb')
+        self.clients.get('dynamodb').wait_for_scan_count_is(
+            1,
+            'Ident = :id and ItemStatus = :status',
+            {
+                ":id": node.get_id(),
+                ":status": 'finished_cloud_init'
+            }
+        )
+        # fetch the node again to pick up all data probably set by cloud init
+        self._event.node = self.repositories.get('node').get(node.get_id())
 
 
     @property
@@ -405,11 +436,6 @@ class Model(object):
     #
     # built-in trigger functions
     #
-
-    def do_wait_for_cloud_init(self, event_data: EventData):
-        self.logger.info('Wait %s for cloud init to become ready', str(self.__cloud_init_delay) + "s")
-        time.sleep(self.__cloud_init_delay)
-
 
     def do_complete_lifecycle_action(self, event_data: EventData):
         _event = self.get_event(event_data)

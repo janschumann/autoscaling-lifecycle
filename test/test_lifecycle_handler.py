@@ -6,7 +6,7 @@ from logging import INFO
 from logging import StreamHandler
 from unittest import mock
 
-from transitions.core import Condition
+from transitions.core import Condition, EventData
 
 from AutoscalingLifecycle import LifecycleHandler
 from AutoscalingLifecycle import Model
@@ -14,6 +14,7 @@ from AutoscalingLifecycle import ConfigurationError
 from AutoscalingLifecycle.clients import DynamoDbClient
 from AutoscalingLifecycle.entity import CommandRepository
 from AutoscalingLifecycle.entity import NodeRepository
+from AutoscalingLifecycle.entity import Node
 from AutoscalingLifecycle.entity import Repositories
 from AutoscalingLifecycle.logging import Logging
 
@@ -106,7 +107,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_stop_tansition_with_error_config(self):
         return [
             {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': 'destination',
                 'triggers': [
                     {
@@ -130,7 +131,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_handle_conditions_transition_config(self):
         return [
             {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': 'state2',
                 'triggers': [
                     {
@@ -185,7 +186,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_handle_ignore_errors_transition_config(self):
         return [
             {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': 'ignored1',
                 'triggers': [
                     {
@@ -243,7 +244,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_handle_failure_transition_config(self):
         return [
             {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': 'not_reachable',
                 'triggers': [
                     {
@@ -299,7 +300,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_handle_failure_in_failure_transition_config(self):
         return [
             {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': None,
                 'triggers': [
                     {
@@ -335,7 +336,16 @@ class TestLifecycleHandler(unittest.TestCase):
         return [
             {
                 'source': 'new',
-                'dest': 'pending',
+                'dest': 'finished_cloud_init',
+                'triggers': [
+                    {
+                        'name': 'register',
+                    }
+                ]
+            },
+            {
+                'source': 'finished_cloud_init',
+                'dest': 'registered',
                 # a single operation for all the nodes
                 # no self.wait_for_next_event() operation: more transitions can be executed
                 'triggers': [
@@ -346,7 +356,7 @@ class TestLifecycleHandler(unittest.TestCase):
                 ]
             },
             {
-                'source': 'pending',
+                'source': 'registered',
                 'dest': 'initializing',
                 # or operation:
                 # if
@@ -559,7 +569,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_stop_after_state_change_transition_config(self):
         return [
             {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': 'destination',
                 'triggers': [
                     {
@@ -593,17 +603,7 @@ class TestLifecycleHandler(unittest.TestCase):
         model = mock.Mock()
         return [
             {
-                'source': 'new',
-                'dest': 'pending',
-                'triggers': [
-                    {
-                        'name': 'register',
-                        'before': [model.do_register],
-                    }
-                ]
-            },
-            {
-                'source': 'pending',
+                'source': 'finished_cloud_init',
                 'dest': 'initializing',
                 'triggers': [
                     {
@@ -977,7 +977,7 @@ class TestLifecycleHandler(unittest.TestCase):
         handler = LifecycleHandler(self.model)
         handler(message)
 
-        self.assertEqual(12, len(self.model.seen_states))
+        self.assertEqual(13, len(self.model.seen_states))
         self.assertEqual('gracefully_rebalancing', self.model.state)
 
 
@@ -1024,4 +1024,25 @@ class TestLifecycleHandler(unittest.TestCase):
         with self.assertRaises(ConfigurationError) as context:
             _ = LifecycleHandler(model)
             self.assertTrue('trigger name trigger is not allowed' in context.exception)
+
+
+    def test_new_nodes_wait_for_cloud_init(self):
+        client = MockDynamoDbClient(mock.Mock(), mock.Mock(), mock.Mock(), 'table')
+        repositories = Repositories(client, mock.Mock())
+        repositories.add('node', NodeRepository)
+        repositories.add('command', CommandRepository)
+
+        client = mock.Mock()
+        clients = mock.Mock()
+        clients.get.return_value = client
+        client.wait_for_scan_count_is = mock.MagicMock()
+        model = Model(clients, repositories, mock.Mock())
+
+        fh = get_fixture('autoscaling_event.json')
+        message = json.load(fh)
+        event = model.load_event(message)
+        fh.close()
+
+        client.wait_for_scan_count_is.assert_called_once()
+
 
