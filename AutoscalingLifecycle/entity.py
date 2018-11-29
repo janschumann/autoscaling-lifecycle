@@ -56,7 +56,6 @@ class Node(object):
 
         self.data = { }
         self.id = id
-        self.data.update({ 'EC2InstanceId': self.id })
         self.type = node_type
         self.data.update({ 'ItemType': self.type })
         self.data.update({ 'ItemStatus': self.status })
@@ -130,7 +129,6 @@ class Node(object):
 
     def set_id(self, ident):
         self.id = ident
-        self.data.update({ 'EC2InstanceId': self.id })
 
 
 class NodeRepository(Repository):
@@ -223,7 +221,7 @@ class NodeRepository(Repository):
 
         nodes = []
         for item in items:
-            node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
+            node = Node(item.pop('Ident'), item.pop('ItemType'))
             node.set_status(item.pop('ItemStatus'))
             for k, v in item.items():
                 node.set_property(k, v)
