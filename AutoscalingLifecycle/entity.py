@@ -45,8 +45,6 @@ class CommandRepository(Repository):
 
 class Node(object):
     id = None
-    type = None
-    status = 'new'
     data = { }
 
 
@@ -54,11 +52,10 @@ class Node(object):
         if id == "" or id is None:
             raise TypeError("id must not be empty")
 
-        self.data = { }
         self.id = id
-        self.type = node_type
-        self.data.update({ 'ItemType': self.type })
-        self.data.update({ 'ItemStatus': self.status })
+        self.data = { }
+        self.data.update({ 'ItemType': node_type })
+        self.data.update({ 'ItemStatus': 'new' })
 
 
     def get_id(self):
@@ -66,21 +63,19 @@ class Node(object):
 
 
     def get_type(self):
-        return self.type
+        return self.data.get('ItemType')
 
 
     def set_type(self, node_type):
-        self.type = node_type
-        self.data.update({ 'ItemType': self.type })
+        self.data.update({ 'ItemType': node_type })
 
 
     def get_status(self):
-        return self.status
+        return self.data.get('ItemStatus')
 
 
     def set_status(self, status):
-        self.status = status
-        self.data.update({ 'ItemStatus': self.status })
+        self.data.update({ 'ItemStatus': status })
 
 
     def has_property(self, property):
@@ -92,10 +87,7 @@ class Node(object):
 
 
     def set_property(self, property, value):
-        if property == 'ItemStatus':
-            self.set_status(value)
-        else:
-            self.data.update({ property: value })
+        self.data.update({ property: value })
 
 
     def unset_property(self, property):
@@ -109,8 +101,8 @@ class Node(object):
     def to_dict(self):
         return {
             'id': self.id,
-            'type': self.type,
-            'status': self.status,
+            'type': self.get_type(),
+            'status': self.get_state(),
             'data': self.data
         }
 
@@ -120,11 +112,11 @@ class Node(object):
 
 
     def get_state(self) -> str:
-        return self.status
+        return self.get_status()
 
 
     def is_new(self) -> bool:
-        return self.status == 'new' or self.status == 'pending' or self.status == 'finished_cloud_init'
+        return self.get_state() in ['new', 'pending', 'finished_cloud_init']
 
 
     def set_id(self, ident):
@@ -143,8 +135,8 @@ class NodeRepository(Repository):
         return node
 
 
-    def put(self, node):
-        self.client.put_item(node.id, node.type, node.data)
+    def put(self, node: Node):
+        self.client.put_item(node.id, node.get_type(), node.data)
 
 
     def get(self, id: str):
