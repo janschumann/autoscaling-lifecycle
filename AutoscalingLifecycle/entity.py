@@ -48,20 +48,11 @@ class Node(object):
     type = None
     status = 'new'
     data = { }
-    mandatory_propertoes = [
-        'EC2InstanceId',
-        'ItemType',
-        'ItemStatus',
-    ]
-    readonly_propertoes = [
-        'EC2InstanceId',
-        'ItemType',
-    ]
 
 
-    def __init__(self, id, node_type):
-        if id == "" or id is None or node_type == "" or node_type is None:
-            raise TypeError("id and node_type must not be empty")
+    def __init__(self, id, node_type = 'unknown'):
+        if id == "" or id is None:
+            raise TypeError("id must not be empty")
 
         self.data = { }
         self.id = id
@@ -109,9 +100,6 @@ class Node(object):
 
 
     def unset_property(self, property):
-        if property in self.mandatory_propertoes:
-            raise TypeError(property + ' cannot be unset.')
-
         _ = self.data.pop(property)
 
 
@@ -162,15 +150,11 @@ class NodeRepository(Repository):
 
 
     def get(self, id: str):
+        node = Node(id, 'unknown')
         item = self.client.get_item(id)
-        if item == { }:
-            node = Node(id, 'unknown')
-        else:
-            node = Node(item.pop('EC2InstanceId'), item.pop('ItemType'))
-            node.set_status(item.pop('ItemStatus'))
-
-        for k, v in item.items():
-            node.set_property(k, v)
+        if item != { }:
+            for k, v in item.items():
+                node.set_property(k, v)
 
         return node
 
