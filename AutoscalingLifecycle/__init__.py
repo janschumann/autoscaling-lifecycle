@@ -316,11 +316,12 @@ class Model(object):
             self.get_command_repository().delete(command_id)
             self._event.set_command(command)
 
-        # set the initial state
         self._event.node = self.get_node_repository().get(self._event.get_instance_id())
-        self._state = self._event.node.get_state()
         if self._event.node.is_new():
             self._wait_for_cloud_init()
+
+        # set the initial state
+        self._state = self._event.node.get_state()
 
         # reset seen states
         self.seen_states = []
