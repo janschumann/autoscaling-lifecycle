@@ -198,7 +198,7 @@ class CustomWaiters(object):
                     name: {
                         "delay": 15,
                         "operation": "Scan",
-                        "maxAttempts": 40,
+                        "maxAttempts": 100,
                         "acceptors": [
                             {
                                 "expected": True,

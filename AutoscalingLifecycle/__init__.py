@@ -333,7 +333,6 @@ class Model(object):
     def _wait_for_cloud_init(self):
         self.logger.debug("Waiting for node to be registered and cloud init to finish ...")
         node = self._event.node
-        d = self.clients.get('dynamodb')
         self.clients.get('dynamodb').wait_for_scan_count_is(
             1,
             'Ident = :id and ItemStatus = :status',
