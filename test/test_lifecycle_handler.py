@@ -25,7 +25,6 @@ def get_fixture(name):
 
 class MockModel(Model):
     __transitions = []
-    __state_machine_attributes = { }
 
 
     def get_transitions(self):
@@ -41,6 +40,18 @@ class MockModel(Model):
     def transitions(self, value):
         self.__transitions = value
         self.seen_states = []
+
+
+class BackupModel(MockModel):
+
+    def load_node(self):
+        if self._event.get_name() == 'backup':
+            node = Node('id')
+            node.set_type('secondary')
+            node.set_state('backup_prepare')
+            return node
+
+        return super().load_node()
 
 
 class MockDynamoDbClient(DynamoDbClient):
@@ -84,6 +95,22 @@ class TestLifecycleHandler(unittest.TestCase):
                 'triggers': [
                     {
                         'name': 'trigger_1',
+                    },
+                ]
+            },
+        ]
+
+
+    def get_backup_tansition_config(self):
+        return [
+            {
+                'source': 'backup_prepare',
+                'dest': 'backing_up',
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                        'conditions': [self.true_condition],
+                        'after': [self.trigger_no_error]
                     },
                 ]
             },
@@ -1045,4 +1072,17 @@ class TestLifecycleHandler(unittest.TestCase):
 
         client.wait_for_scan_count_is.assert_called_once()
 
+
+    def test_scheduled_event(self):
+        model = BackupModel(mock.Mock(), mock.Mock(), mock.Mock())
+        model.transitions = self.get_backup_tansition_config()
+
+        fh = get_fixture('scheduled_event.json')
+        message = json.load(fh)
+        fh.close()
+        handler = LifecycleHandler(model)
+        handler(message)
+
+        self.assertEqual(1, len(model.seen_states))
+        self.assertEqual('backing_up', model.state)
 

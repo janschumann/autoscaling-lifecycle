@@ -1,0 +1,22 @@
+{
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventSubscriptionArn": "arn:aws:sns:eu-central-1:384726357869:mongodb-live-lifecycle:869bca89-c317-4d4c-87de-41561d33526f",
+      "EventVersion": "1.0",
+      "Sns": {
+        "Message": "{\"version\":\"0\",\"id\":\"7b51be95-c81e-c009-2435-95c2efd5a56f\",\"detail-type\":\"Scheduled Event\",\"source\":\"aws.events\",\"account\":\"384726357869\",\"time\":\"2018-11-29T12:40:31Z\",\"region\":\"eu-central-1\",\"resources\":[\"arn:aws:events:eu-central-1:384726357869:rule/backup\"],\"detail\":{}}",
+        "MessageAttributes": {},
+        "MessageId": "e3bbd7b0-a46f-5e07-8d7c-83c944e2d501",
+        "Signature": "H4oA6cuuXN+FU4ZuJ1imv4u+ucBk+M7NRVVWKNhkxgXeOrUxk2Qd0H58SnFONCBRvTsgMvYhtQWVFubvKBXnS7UyrlbOf1AOuYaKveCHjf9ep3GJHupfycSaSKDjQoNZFcqYTmtdFWnffvmqgE3QkCSNZOVaiRFh+g60ie6MSwXWclL5HQvnnHIjY4i/3fByXaDset6Z7iC3ae2xtm34v+KgPu/umIWGpEbEvCEOLAglCHAjBlkVM3rWAHFJd2C2PQa6hPHtAnU9/ufQseVNrE9AtVJLDg+8GkTG70JsPytox0YBy/pvnILomQZcBU4vQ6VMgjEWhCDBmtgXjQnccQ==",
+        "SignatureVersion": "1",
+        "SigningCertUrl": "https://sns.eu-central-1.amazonaws.com/SimpleNotificationService-ac565b8b1a6c5d002d285f9598aa1d9b.pem",
+        "Subject": null,
+        "Timestamp": "2018-11-29T12:40:45.269Z",
+        "TopicArn": "arn:aws:sns:eu-central-1:384726357869:mongodb-live-lifecycle",
+        "Type": "Notification",
+        "UnsubscribeUrl": "https://sns.eu-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:eu-central-1:384726357869:mongodb-live-lifecycle:869bca89-c317-4d4c-87de-41561d33526f"
+      }
+    }
+  ]
+}

@@ -63,12 +63,19 @@ class Event(object):
         elif event.get('source') == 'aws.ssm':
             return SsmEvent(event)
 
+        elif event.get('source') == 'aws.events':
+            return ScheduledEvent(event)
+
         else:
             raise RuntimeError('Unkonwn event %s', event.get('source'))
 
 
     def __init__(self, event: dict):
         self._event = event
+
+
+    def get_name(self):
+        return self.get_autoscaling_group_name()
 
 
     def to_str(self):
@@ -112,7 +119,7 @@ class Event(object):
         self._command = command
 
 
-    def gez_command(self) -> dict:
+    def get_command(self) -> dict:
         return self._command
 
 
@@ -247,15 +254,15 @@ class SsmEvent(Event):
 
 
     def get_lifecycle_action_token(self) -> str:
-        return self._command.get('detail').get('LifecycleActionToken')
+        return self._command.get('detail').get('LifecycleActionToken', '')
 
 
     def get_lifecycle_transition(self) -> str:
-        return self._command.get('detail').get('LifecycleTransition')
+        return self._command.get('detail').get('LifecycleTransition', '')
 
 
     def get_lifecycle_hook_name(self) -> str:
-        return self._command.get('detail').get('LifecycleHookName')
+        return self._command.get('detail').get('LifecycleHookName', '')
 
 
     def get_autoscaling_group_name(self) -> str:
@@ -267,7 +274,47 @@ class SsmEvent(Event):
 
 
     def get_metadata(self) -> dict:
-        return self._command.get('detail').get('NotificationMetadata')
+        return self._command.get('detail').get('NotificationMetadata', { })
+
+
+class ScheduledEvent(Event):
+    def get_name(self):
+        return self._event.get('resources')[0].split('/')[-1]
+
+
+    def get_lifecycle_action_token(self) -> str:
+        raise NotImplementedError("A scheduled event can not handle lifecycle.")
+
+
+    def get_lifecycle_transition(self) -> str:
+        return ""
+
+
+    def get_lifecycle_hook_name(self) -> str:
+        raise NotImplementedError("A scheduled event can not handle lifecycle.")
+
+
+    def get_autoscaling_group_name(self) -> str:
+        return self.get_name()
+
+
+    def get_instance_id(self) -> str:
+        return self.node.get_id()
+
+
+    def get_metadata(self) -> dict:
+        return { }
+
+
+    def get_command_metadata(self):
+        data = super().get_command_metadata()
+        data.get('detail').update({
+            # @todo this property should be renamed to Name to reflect the event name
+            'AutoScalingGroupName': self.get_name(),
+            'EC2InstanceId': self.get_instance_id(),
+            'NotificationMetadata': self.get_metadata()
+        })
+        return data
 
 
 class Model(object):
@@ -316,7 +363,7 @@ class Model(object):
             self.get_command_repository().delete(command_id)
             self._event.set_command(command)
 
-        self._event.node = self.get_node_repository().get(self._event.get_instance_id())
+        self._event.node = self.load_node()
         if self._event.node.is_new():
             self._wait_for_cloud_init()
 
@@ -329,6 +376,10 @@ class Model(object):
         self.report()
 
         return self._event
+
+
+    def load_node(self):
+        return self.get_node_repository().get(self._event.get_instance_id())
 
 
     def _wait_for_cloud_init(self):

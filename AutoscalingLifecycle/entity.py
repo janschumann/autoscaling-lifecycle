@@ -116,7 +116,7 @@ class Node(object):
 
 
     def is_new(self) -> bool:
-        return self.get_state() in ['new', 'pending', 'finished_cloud_init']
+        return self.get_state() in ['new', 'pending']
 
 
     def set_id(self, ident):
