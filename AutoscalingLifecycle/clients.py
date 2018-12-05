@@ -369,6 +369,37 @@ class Ec2Client(BaseClient):
         return instances
 
 
+    def get_instance(self, id) -> dict:
+        response = self.client.describe_instances(
+            InstanceIds=[id],
+            Filters=[
+                {
+                    'Name': 'instance-state-name',
+                    'Values': [
+                        'running',
+                    ]
+                },
+            ]
+        )
+
+        for reservation in response.get('Reservations', []):
+            for instance in reservation.get('Instances', []):
+                return instance
+
+        return { }
+
+
+    def create_snapshot(self, description, volume_id):
+        response = self.client.create_sanpshot(
+            Description=description,
+            VolumeId=volume_id,
+        )
+
+        self.client.get_waiter('SnapshotCompleted').wait(
+            SnapshotIds=[response.get('SnapshotId')],
+        )
+
+
 class AutoscalingClient(BaseClient):
 
     def set_transition(self, transition):
