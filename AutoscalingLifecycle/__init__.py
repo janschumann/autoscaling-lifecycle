@@ -302,7 +302,7 @@ class ScheduledEvent(Event):
         if self.node is not None:
             return self.node.get_id()
 
-        return ''
+        return 'n/a'
 
 
     def get_metadata(self) -> dict:
@@ -850,16 +850,17 @@ class LifecycleHandler(object):
 
     def __log_autoscaling_activity(self, event_data: EventData):
         _event = self.__get_event(event_data)
-        activity = self.machine.model.clients.get('autoscaling').get_activity(
-            _event.get_autoscaling_group_name(), _event.is_launching(), _event.get_instance_id()
-        )
-        if activity == { }:
-            self.__get_logger().warning('Could not find autoscaling activity for node %s', _event.get_instance_id())
-            return
+        if type(_event) is not ScheduledEvent:
+            activity = self.machine.model.clients.get('autoscaling').get_activity(
+                _event.get_autoscaling_group_name(), _event.is_launching(), _event.get_instance_id()
+            )
+            if activity == { }:
+                self.__get_logger().warning('Could not find autoscaling activity for node %s', _event.get_instance_id())
+                return
 
-        self.__get_logger().info('%s %s autoscaling activity on event %s: %s', activity.get('StatusCode').upper(),
-                                 'launching' if _event.is_launching else 'terminating',
-                                 repr(event_data), activity)
+            self.__get_logger().info('%s %s autoscaling activity on event %s: %s', activity.get('StatusCode').upper(),
+                                     'launching' if _event.is_launching else 'terminating',
+                                     repr(event_data), activity)
 
 
     #
