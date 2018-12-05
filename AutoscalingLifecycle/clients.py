@@ -395,7 +395,7 @@ class Ec2Client(BaseClient):
             VolumeId=volume_id,
         )
 
-        self.client.get_waiter('SnapshotCompleted').wait(
+        self.client.get_waiter('snapshot_completed').wait(
             SnapshotIds=[response.get('SnapshotId')],
         )
 
