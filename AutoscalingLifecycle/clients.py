@@ -390,7 +390,7 @@ class Ec2Client(BaseClient):
 
 
     def create_snapshot(self, description, volume_id):
-        response = self.client.create_sanpshot(
+        response = self.client.create_snapshot(
             Description=description,
             VolumeId=volume_id,
         )
