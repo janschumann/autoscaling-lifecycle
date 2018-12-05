@@ -299,7 +299,10 @@ class ScheduledEvent(Event):
 
 
     def get_instance_id(self) -> str:
-        return self.node.get_id()
+        if self.node is not None:
+            return self.node.get_id()
+
+        return ''
 
 
     def get_metadata(self) -> dict:
