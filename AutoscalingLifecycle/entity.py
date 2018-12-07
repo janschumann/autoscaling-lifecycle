@@ -39,6 +39,15 @@ class CommandRepository(Repository):
         return self.client.get_item(id)
 
 
+    def pop(self, id: str):
+        command = self.get(id)
+        if command == { }:
+            raise RuntimeError('Could not load command %s.' % id)
+        self.delete(id)
+
+        return command
+
+
     def delete(self, id: str):
         self.client.delete_item(id)
 
@@ -124,16 +133,6 @@ class Node(object):
 
 
 class NodeRepository(Repository):
-
-    def register(self, id: str, node_type: str, data: dict) -> Node:
-        node = Node(id, node_type)
-        for k, v in data.items():
-            node.set_property(k, v)
-
-        self.put(node)
-
-        return node
-
 
     def put(self, node: Node):
         self.client.put_item(node.id, node.get_type(), node.data)

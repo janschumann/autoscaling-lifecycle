@@ -27,7 +27,7 @@ class ClientFactory(object):
         """
         self.session = session
         self.logger = logger
-        self.clients = { }
+        self.clients = {}
 
 
     def get(self, name: str, region_name: str = 'eu-central-1'):
@@ -51,7 +51,7 @@ class ClientFactory(object):
         if client is None:
             self.logger.debug('Client %s in region %s not created. Creating ...', name, region_name)
             client = self.session.client(name, region_name = region_name)
-            self.clients.update({ key: client })
+            self.clients.update({key: client})
 
         return client
 
@@ -140,7 +140,7 @@ class CustomWaiters(object):
             }
         }
     }
-    waiters = { }
+    waiters = {}
 
 
     def __init__(self, clients: ClientFactory, logger: Logger):
@@ -217,9 +217,6 @@ class CustomWaiters(object):
 
     def get_autoscaling_complete_for(self, instance_id, is_launching):
         """
-        :type size: int or str
-        :param size: The number of expected scan items to find
-
         :rtype: botocore.waiter.Waiter
         :return: The waiter object.
         """
@@ -275,7 +272,7 @@ class CustomWaiters(object):
         if name not in model.waiter_names:
             raise self.message_formatter.get_error(KeyError, 'Waiter %s does not exist', name)
 
-        self.waiters.update({ name: waiter.create_waiter_with_client(name, model, client) })
+        self.waiters.update({name: waiter.create_waiter_with_client(name, model, client)})
 
 
 class Clients(object):
@@ -286,12 +283,12 @@ class Clients(object):
     :param __clients: A dict of client instances
     :type __clients: dict
     """
-    __client_specs = { }
-    __clients = { }
+    __client_specs = dict()
+    __clients = dict()
 
 
-    def __init__(self, cfactory: ClientFactory, waiters: CustomWaiters, logging: Logging):
-        self.cfactory = cfactory
+    def __init__(self, client_factory: ClientFactory, waiters: CustomWaiters, logging: Logging):
+        self.client_factory = client_factory
         self.waiters = waiters
         self.logging = logging
 
@@ -312,7 +309,7 @@ class Clients(object):
 
         client = self.__clients.get('name', None)
         if client is None:
-            client = spec.get('class')(self.cfactory.get(name), self.waiters, self.logging, *spec.get('args'))
+            client = spec.get('class')(self.client_factory.get(name), self.waiters, self.logging, *spec.get('args'))
 
         return client
 
@@ -369,9 +366,9 @@ class Ec2Client(BaseClient):
         return instances
 
 
-    def get_instance(self, id) -> dict:
+    def get_instance(self, instance_id) -> dict:
         response = self.client.describe_instances(
-            InstanceIds=[id],
+            InstanceIds=[instance_id],
             Filters=[
                 {
                     'Name': 'instance-state-name',
@@ -386,7 +383,7 @@ class Ec2Client(BaseClient):
             for instance in reservation.get('Instances', []):
                 return instance
 
-        return { }
+        return dict()
 
 
     def create_snapshot(self, description, volume_id):
@@ -401,39 +398,6 @@ class Ec2Client(BaseClient):
 
 
 class AutoscalingClient(BaseClient):
-
-    def set_transition(self, transition):
-        self.transition = transition
-        if self.transition != 'autoscaling:EC2_INSTANCE_LAUNCHING' and self.transition != 'autoscaling:EC2_INSTANCE_TERMINATING':
-            raise self.formatter.get_error(TypeError, 'Unknown autoscaling transition %s', self.transition)
-
-        self.logger.debug('Transition: %s', self.transition)
-
-
-    def is_launching(self) -> bool:
-        """
-        :rtype: bool
-        :return: Whether we react on a launch event
-        """
-        self.ensure_transition_is_set()
-
-        return self.transition == 'autoscaling:EC2_INSTANCE_LAUNCHING'
-
-
-    def is_terminating(self) -> bool:
-        """
-        :rtype: bool
-        :return: Whether we react on a terminate event
-        """
-        self.ensure_transition_is_set()
-
-        return self.transition == 'autoscaling:EC2_INSTANCE_TERMINATING'
-
-
-    def ensure_transition_is_set(self):
-        if self.transition is None:
-            raise self.formatter.get_error(TypeError, 'Transition not set')
-
 
     def complete_lifecycle_action(self, hook_name, group_name, token, result, instance_id):
         self.logger.debug('Completing lifecycle action for %s with %s', instance_id, result)
@@ -806,12 +770,12 @@ class SnsClient(BaseClient):
         self.publish(subject, message, region)
 
 
-    def publish_activity(self, status, action, region = "eu-central-1"):
-        subject = self.formatter.format("%s : Finished %s", [status, action])
+    def publish_activity(self, status, subject, detail, region = "eu-central-1"):
+        subject = self.formatter.format("%s : %s", [status, subject])
         message = self.formatter.to_str({
-            'default': subject,
-            'sms': subject,
-            'email': subject
+            'default': detail,
+            'sms': detail,
+            'email': detail
         })
         self.publish(subject, message, region)
 
@@ -819,7 +783,7 @@ class SnsClient(BaseClient):
     def publish_error(self, exception, action, region = "eu-central-1"):
         subject = self.formatter.format(
             'ERROR : while performing %s in environment %s: %s',
-            [action, self.env, repr(exception)]
+            [repr(action), self.env, repr(exception)]
         )
         result = self.formatter.to_str(ExceptionInfo.from_current().to_dict())
         message = self.formatter.to_str({ 'default': result })

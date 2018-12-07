@@ -10,6 +10,7 @@ from transitions.core import Condition, EventData
 
 from AutoscalingLifecycle import LifecycleHandler
 from AutoscalingLifecycle import Model
+from AutoscalingLifecycle import Event
 from AutoscalingLifecycle import ConfigurationError
 from AutoscalingLifecycle.clients import DynamoDbClient
 from AutoscalingLifecycle.entity import CommandRepository
@@ -21,6 +22,14 @@ from AutoscalingLifecycle.logging import Logging
 
 def get_fixture(name):
     return open(os.path.dirname(os.path.abspath(__file__)) + '/fixtures/' + name, 'r')
+
+
+def get_event(file):
+    fh = get_fixture(file)
+    message = json.load(fh)
+    fh.close()
+
+    return Event(json.loads(message.get('Records')[0].get('Sns').get('Message')))
 
 
 class MockModel(Model):
@@ -39,19 +48,7 @@ class MockModel(Model):
     @transitions.setter
     def transitions(self, value):
         self.__transitions = value
-        self.seen_states = []
-
-
-class BackupModel(MockModel):
-
-    def load_node(self):
-        if self._event.get_name() == 'backup':
-            node = Node('id')
-            node.set_type('secondary')
-            node.set_state('backup_prepare')
-            return node
-
-        return super().load_node()
+        self.passed_states = []
 
 
 class MockDynamoDbClient(DynamoDbClient):
@@ -71,9 +68,10 @@ class MockDynamoDbClient(DynamoDbClient):
 
 class TestLifecycleHandler(unittest.TestCase):
     model = None
-
+    count = 0
 
     def setUp(self):
+        self.count = 0
         logging = Logging("TEST", True)
         #h = StreamHandler()
         #h.setLevel(INFO)
@@ -90,7 +88,7 @@ class TestLifecycleHandler(unittest.TestCase):
     def get_default_tansition_config(self):
         return [
             {
-                'source': 'source',
+                'source': 'finished_cloud_init',
                 'dest': 'destination',
                 'triggers': [
                     {
@@ -101,21 +99,67 @@ class TestLifecycleHandler(unittest.TestCase):
         ]
 
 
+    def get_before_node_load_tansition_config(self):
+        return [
+            {
+                'source': 'backup',
+                'dest': None,
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                    },
+                ],
+            },
+        ]
+
+
     def get_backup_tansition_config(self):
         return [
+            {
+                'source': 'backup',
+                'dest': 'backup_prepare',
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                        'before': [self.load_node]
+                    },
+                ],
+            },
             {
                 'source': 'backup_prepare',
                 'dest': 'backing_up',
                 'triggers': [
                     {
-                        'name': 'trigger_1',
-                        'conditions': [self.true_condition],
+                        'name': 'trigger_2',
                         'after': [self.trigger_no_error]
                     },
                 ]
             },
         ]
 
+
+    def use_event_methods_in_transition_config(self):
+        return [
+            {
+                'source': 'finished_cloud_init',
+                'dest': 'state2',
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                        'conditions': [self.model.event.get_lifecycle_data().is_launching]
+                    },
+                ],
+            },
+            {
+                'source': 'state2',
+                'dest': None,
+                'triggers': [
+                    {
+                        'name': 'trigger_2',
+                    },
+                ]
+            },
+        ]
 
     def get_illegal_trigger_name_tansition_config(self):
         return [
@@ -308,6 +352,7 @@ class TestLifecycleHandler(unittest.TestCase):
                     {
                         'name': 'failure_trigger',
                         'before': [self.trigger_no_error],
+                        'ignore_errors': True
                     },
 
                 ]
@@ -318,6 +363,7 @@ class TestLifecycleHandler(unittest.TestCase):
                 'triggers': [
                     {
                         'name': 'last',
+                        'ignore_errors': True
                     },
                 ]
             },
@@ -626,6 +672,40 @@ class TestLifecycleHandler(unittest.TestCase):
         ]
 
 
+    def get_stop_after_trigger_transition_config(self):
+        return [
+            {
+                'source': 'finished_cloud_init',
+                'dest': 'destination',
+                'triggers': [
+                    {
+                        'name': 'trigger_1',
+                    },
+                ],
+            },
+            {
+                'source': ['pending', 'destination'],
+                'dest': 'last',
+                'triggers': [
+                    {
+                        'name': 'trigger_2',
+                        'before': [self.trigger_count],
+                        'after': [self.trigger_count],
+                        'stop_after_trigger': True
+                    },
+                ],
+            },
+            {
+                'source': 'last',
+                'dest': 'unreachable',
+                'triggers': [
+                    {
+                        'name': 'not_called',
+                    }
+                ],
+            },
+        ]
+
     def get_validate_transitions(self):
         model = mock.Mock()
         return [
@@ -864,6 +944,13 @@ class TestLifecycleHandler(unittest.TestCase):
         return
 
 
+    def load_node(self, *args, **kwargs):
+        args[0].model.node = Node('n/a')
+
+
+    def trigger_count(self, *args, **kwargs):
+        self.count += 1
+
     def true_condition(self, *args, **kwargs):
         return True
 
@@ -873,11 +960,11 @@ class TestLifecycleHandler(unittest.TestCase):
         model.get_transitions.return_value = self.get_default_tansition_config()
 
         handler = LifecycleHandler(model)
-        triggers = handler.machine.get_triggers("source")
+        triggers = handler.machine.get_triggers("finished_cloud_init")
         self.assertEqual(len(triggers), 1)
 
         event = handler.machine.events.get(triggers[0])
-        transition = event.transitions.get('source')[0]
+        transition = event.transitions.get('finished_cloud_init')[0]
 
         self.assertEqual(0, len(transition.prepare))
 
@@ -902,12 +989,12 @@ class TestLifecycleHandler(unittest.TestCase):
         model.get_transitions.return_value = config
 
         handler = LifecycleHandler(model)
-        triggers = handler.machine.get_triggers("source")
+        triggers = handler.machine.get_triggers("finished_cloud_init")
         event = handler.machine.events.get(triggers[0])
-        transition = event.transitions.get('source')[0]
+        transition = event.transitions.get('finished_cloud_init')[0]
 
         self.assertIsInstance(transition.after[-1], types.MethodType)
-        self.assertEqual(transition.after[-1].__name__, '__continue_with_next_state')
+        self.assertEqual(transition.after[-1].__name__, '__stop_after_trigger')
 
 
     def test_stop_after_state_change_flag_is_accepted(self):
@@ -932,113 +1019,114 @@ class TestLifecycleHandler(unittest.TestCase):
         model.get_transitions.return_value = config
 
         handler = LifecycleHandler(model)
-        triggers = handler.machine.get_triggers("source")
+        triggers = handler.machine.get_triggers("finished_cloud_init")
         event = handler.machine.events.get(triggers[0])
-        transition = event.transitions.get('source')[0]
+        transition = event.transitions.get('finished_cloud_init')[0]
 
         self.assertIsInstance(transition.prepare[0], types.MethodType)
         self.assertEqual(transition.prepare[0].__name__, '__ignore_operation_failure')
 
 
     def test_ignore_errors_behavior(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
         self.model.transitions = self.get_handle_ignore_errors_transition_config()
-
-        fh = get_fixture('ssm_event.json')
-        message = json.load(fh)
-        fh.close()
         handler = LifecycleHandler(self.model)
-        handler(message)
+        handler()
 
-        self.assertEqual(4, len(self.model.seen_states))
+        self.assertEqual(4, len(self.model.passed_states))
         self.assertEqual('last', self.model.state)
 
 
     def test_failure_behavior(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
         self.model.transitions = self.get_handle_failure_transition_config()
-
-        fh = get_fixture('ssm_event.json')
-        message = json.load(fh)
-        fh.close()
         handler = LifecycleHandler(self.model)
-        handler(message)
+        handler()
 
-        self.assertEqual(3, len(self.model.seen_states))
+        self.assertEqual(3, len(self.model.passed_states))
         self.assertEqual('last', self.model.state)
 
 
     def test_failure_in_failure_handling_behavior(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
         self.model.transitions = self.get_handle_failure_in_failure_transition_config()
-
-        fh = get_fixture('ssm_event.json')
-        message = json.load(fh)
-        fh.close()
         handler = LifecycleHandler(self.model)
 
         with self.assertRaises(RuntimeError) as context:
-            handler(message)
+            handler()
             self.assertTrue('error in trigger method' in context.exception)
 
-        self.assertEqual(1, len(self.model.seen_states))
+        self.assertEqual(1, len(self.model.passed_states))
         self.assertEqual('failure', self.model.state)
 
 
     def test_conditions_behavior(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
         self.model.transitions = self.get_handle_conditions_transition_config()
-
-        fh = get_fixture('ssm_event.json')
-        message = json.load(fh)
-        fh.close()
         handler = LifecycleHandler(self.model)
-        handler(message)
+        handler()
 
-        self.assertEqual(3, len(self.model.seen_states))
+        self.assertEqual(3, len(self.model.passed_states))
         self.assertEqual('last', self.model.state)
 
 
     def test_docker_transitions_for_new_node(self):
+        event = get_event('autoscaling_event.json')
+        self.model.initialize(event)
         self.model.transitions = self.get_docker_transitions()
-
-        fh = get_fixture('autoscaling_event.json')
-        message = json.load(fh)
-        fh.close()
         handler = LifecycleHandler(self.model)
-        handler(message)
+        handler()
 
-        self.assertEqual(13, len(self.model.seen_states))
+        self.assertEqual(13, len(self.model.passed_states))
         self.assertEqual('gracefully_rebalancing', self.model.state)
 
 
     def test_stop_transition_after_state_change(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
         self.model.transitions = self.get_stop_after_state_change_transition_config()
-
-        fh = get_fixture('ssm_event.json')
-        message = json.load(fh)
-        fh.close()
         handler = LifecycleHandler(self.model)
-        handler(message)
+        handler()
 
-        self.assertEqual(2, len(self.model.seen_states))
+        self.assertEqual(2, len(self.model.passed_states))
         self.assertEqual('last', self.model.state)
 
 
-    def test_stop_transition_with_error(self):
-        self.model.transitions = self.get_stop_tansition_with_error_config()
-
-        fh = get_fixture('ssm_event.json')
-        message = json.load(fh)
-        fh.close()
+    def test_stop_transition_after_trigger(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
+        self.model.transitions = self.get_stop_after_trigger_transition_config()
         handler = LifecycleHandler(self.model)
-        handler(message)
+        handler()
 
-        self.assertEqual(1, len(self.model.seen_states))
+        self.assertEqual(2, len(self.model.passed_states))
+        self.assertEqual('last', self.model.state)
+        self.assertEqual(2, self.count)
+
+    def test_stop_transition_with_error(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
+        self.model.transitions = self.get_stop_tansition_with_error_config()
+        handler = LifecycleHandler(self.model)
+        handler()
+
+        self.assertEqual(1, len(self.model.passed_states))
         self.assertEqual('failure', self.model.state)
 
 
     def test_validation(self):
+        event = mock.Mock()
+        event.is_command.return_value = False
+        event.is_lifecycle.return_value = False
+        self.model.initialize(event)
         self.model.transitions = self.get_validate_transitions()
         handler = LifecycleHandler(self.model)
 
-        self.assertEqual(21, len(handler.machine.states.keys()))
+        self.assertEqual(22, len(handler.machine.states.keys()))
 
 
     def test_illegal_trigger_name_raises(self):
@@ -1065,24 +1153,59 @@ class TestLifecycleHandler(unittest.TestCase):
         client.wait_for_scan_count_is = mock.MagicMock()
         model = Model(clients, repositories, mock.Mock())
 
-        fh = get_fixture('autoscaling_event.json')
-        message = json.load(fh)
-        event = model.load_event(message)
-        fh.close()
+        event = get_event('autoscaling_event.json')
+        model.initialize(event)
 
         client.wait_for_scan_count_is.assert_called_once()
 
 
-    def test_scheduled_event(self):
-        model = BackupModel(mock.Mock(), mock.Mock(), mock.Mock())
-        model.transitions = self.get_backup_tansition_config()
-
-        fh = get_fixture('scheduled_event.json')
-        message = json.load(fh)
-        fh.close()
+    def test_scheduled_event_does_not_load_a_node_by_default(self):
+        model = MockModel(mock.Mock(), mock.Mock(), mock.Mock())
+        event = get_event('scheduled_event.json')
+        model.initialize(event)
+        model.transitions = self.get_before_node_load_tansition_config()
         handler = LifecycleHandler(model)
-        handler(message)
+        handler()
 
-        self.assertEqual(1, len(model.seen_states))
+        self.assertEqual(0, len(model.passed_states))
+        self.assertEqual('backup', model.state)
+        self.assertIsNone(model.node)
+
+
+    def test_scheduled_event_can_load_node_during_transitions(self):
+        model = MockModel(mock.Mock(), mock.Mock(), mock.Mock())
+        event = get_event('scheduled_event.json')
+        model.initialize(event)
+        model.transitions = self.get_backup_tansition_config()
+        handler = LifecycleHandler(model)
+        handler()
+
+        self.assertEqual(2, len(model.passed_states))
         self.assertEqual('backing_up', model.state)
+        self.assertIsNotNone(model.node)
 
+
+    def test_use_event_methods_in_transition_config(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
+        self.model.transitions = self.use_event_methods_in_transition_config()
+        handler = LifecycleHandler(self.model)
+        handler()
+
+        self.assertEqual(1, len(self.model.passed_states))
+        self.assertEqual('state2', self.model.state)
+
+
+    def test_initialisation_does_not_update_state(self):
+        event = get_event('ssm_event.json')
+        self.model.initialize(event)
+        self.model.transitions = self.get_default_tansition_config()
+        handler = LifecycleHandler(self.model)
+
+        self.assertEqual(0, len(self.model.passed_states))
+        self.assertEqual('finished_cloud_init', self.model.state)
+
+        handler()
+
+        self.assertEqual(1, len(self.model.passed_states))
+        self.assertEqual('destination', self.model.state)

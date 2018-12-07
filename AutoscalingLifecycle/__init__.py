@@ -1,6 +1,6 @@
 import json
-import time
 from logging import Logger
+from logging import DEBUG
 
 from transitions import EventData
 from transitions import Machine
@@ -22,21 +22,83 @@ def listify(obj):
     return obj if isinstance(obj, list) else [obj]
 
 
-class Event(object):
-    """
-    :param _event:
-    :type _event: dict
-    :param node:
-    :type node: Node
-    :param command:
-    :type _command: Command
-    """
+class LifecycleData(object):
 
     LAUNCHING = 'autoscaling:EC2_INSTANCE_LAUNCHING'
     TERMINATING = 'autoscaling:EC2_INSTANCE_TERMINATING'
 
+    def __init__(self, data: dict):
+        self.data = data
+        self.metadata = self.data.get('NotificationMetadata')
+        if type(self.metadata) is not dict:
+            self.data.update({
+                'NotificationMetadata': json.loads(self.metadata)
+            })
+
+
+    def to_dict(self):
+        return self.data
+
+
+    def get_lifecycle_action_token(self) -> str:
+        return self.data.get('LifecycleActionToken')
+
+
+    def get_lifecycle_transition(self) -> str:
+        return self.data.get('LifecycleTransition')
+
+
+    def get_lifecycle_hook_name(self) -> str:
+        return self.data.get('LifecycleHookName')
+
+
+    def get_autoscaling_group_name(self) -> str:
+        return self.data.get('AutoScalingGroupName')
+
+
+    def get_instance_id(self) -> str:
+        return self.data.get('EC2InstanceId')
+
+
+    def get_metadata(self) -> dict:
+        return self.data.get('NotificationMetadata')
+
+
+    def is_launching(self, *args) -> bool:
+        """
+        *args are required to support this method within transition configs
+              but not used
+
+        :rtype: bool
+        :return: Whether we react on a launch event
+        """
+        return self.get_lifecycle_transition() == self.LAUNCHING
+
+
+    def is_terminating(self, *args) -> bool:
+        """
+        *args are required to support this method within transition configs
+              but not used
+
+        :rtype: bool
+        :return: Whether we react on a terminate event
+        """
+        return self.get_lifecycle_transition() == self.TERMINATING
+
+
+class Event(object):
+    """
+    :param _name:
+    :type _name: str
+    :param _event:
+    :type _event: dict
+    :param _lifecycle_data:
+    :type _lifecycle_data: LifecycleData
+    """
+
     __AUTOSCALING = 'aws.autoscaling'
     __COMMAND = 'aws.ssm'
+    __SCHEDULED = 'aws.events'
 
     _CONTINUE = 'CONTINUE'
     _ABANDON = 'ABANDON'
@@ -45,58 +107,38 @@ class Event(object):
     NODE = 'node'
     COMMAND = 'command'
 
-    _event = { }
-    _command = { }
-
-    node = None
+    name = None
+    _event = None
+    _lifecycle_data = None
 
     has_failure = False
 
 
-    @staticmethod
-    def from_sns_message(message: dict):
-        event = json.loads(message.get('Records')[0].get('Sns').get('Message'))
-
-        if event.get('source') == 'aws.autoscaling':
-            return AutoscalingEvent(event)
-
-        elif event.get('source') == 'aws.ssm':
-            return SsmEvent(event)
-
-        elif event.get('source') == 'aws.events':
-            return ScheduledEvent(event)
-
-        else:
-            raise RuntimeError('Unkonwn event %s', event.get('source'))
-
-
     def __init__(self, event: dict):
         self._event = event
+        if self.is_autoscaling():
+            self.set_lifecycle_data(self.get_detail())
+
+        self.name = self._event.get('detail-type')
+        if self.is_command():
+            if self.is_lifecycle():
+                self.name = '%s for %s' % (self.name, self._lifecycle_data.get_lifecycle_transition())
+
+        elif self.is_scheduled():
+            self.name = self._event.get('resources')[0].split('/')[-1]
 
 
     def get_name(self):
-        return self.get_autoscaling_group_name()
+        return self.name
 
 
-    def to_str(self):
-        msg = '%s in group "%s" on instance "%s"' % (
-            self._event.get('detail-type'),
-            self.get_autoscaling_group_name(),
-            self.node.get_id()
-        )
-        return msg
+    def set_name(self, name: str):
+        if name != '':
+            self.name = name
 
 
-    def get_raw_event(self) -> dict:
+    def get_raw(self) -> dict:
         return self._event
-
-
-    def get_event(self) -> dict:
-        return self.get_raw_event()
-
-
-    def get_command_metadata(self) -> dict:
-        return self.get_event()
 
 
     def get_detail(self) -> dict:
@@ -107,217 +149,94 @@ class Event(object):
         return self._event.get('source')
 
 
-    def is_autoscaling(self) -> bool:
+    def is_autoscaling(self, *args) -> bool:
+        """
+        *args are required to support this method within transition configs
+              but not used
+        """
         return self.get_source() == self.__AUTOSCALING
 
 
-    def has_command(self) -> bool:
+    def is_command(self, *args) -> bool:
+        """
+        *args are required to support this method within transition configs
+              but not used
+        """
         return self.get_source() == self.__COMMAND
 
 
-    def set_command(self, command: dict):
-        self._command = command
-
-
-    def get_command(self) -> dict:
-        return self._command
-
-
-    def is_successful(self) -> bool:
-        return True
-
-
-    def is_launching(self) -> bool:
+    def is_scheduled(self, *args) -> bool:
         """
-        :rtype: bool
-        :return: Whether we react on a launch event
+        *args are required to support this method within transition configs
+              but not used
         """
-        return self.get_lifecycle_transition() == self.LAUNCHING
+        return self.get_source() == self.__SCHEDULED
 
 
-    def is_terminating(self) -> bool:
+    def is_lifecycle(self, *args):
         """
-        :rtype: bool
-        :return: Whether we react on a terminate event
+        *args are required to support this method within transition configs
+              but not used
         """
-        return self.get_lifecycle_transition() == self.TERMINATING
+        return self._lifecycle_data is not None
+
+
+    def set_lifecycle_data(self, data: dict):
+        if data != dict():
+            self._lifecycle_data = LifecycleData(data)
+
+
+    def get_lifecycle_data(self) -> LifecycleData:
+        if not self.is_lifecycle():
+            raise RuntimeError('This is not a lifecycle event.')
+
+        return self._lifecycle_data
 
 
     def get_lifecycle_result(self) -> str:
-        if self.is_terminating() and not self.has_failure:
+        if not self.is_lifecycle():
+            raise RuntimeError('This is not a lifecycle event.')
+
+        if not self.has_failure and (self._lifecycle_data.is_terminating() or self.is_successful()):
             return self._CONTINUE
 
         return self._ABANDON
 
 
-    def get_lifecycle_action_token(self) -> str:
-        raise NotImplementedError()
+    def to_str(self):
+        msg = self.get_name()
+
+        if self.is_autoscaling() or self.is_command():
+            if self.is_lifecycle():
+                msg = '%s in group "%s" on instance "%s"' % (
+                    msg,
+                    self._lifecycle_data.get_autoscaling_group_name(),
+                    self._lifecycle_data.get_instance_id()
+                )
+
+        if self.is_command():
+            msg = '%s finished commands %s on %s' % (
+                msg,
+                ','.join(json.loads(self.get_detail().get('parameters')).get('commands')),
+                ','.join([resource.split('/')[-1] for resource in self._event.get('resources')])
+            )
+
+        return msg
 
 
-    def get_lifecycle_transition(self) -> str:
-        raise NotImplementedError()
+    def is_successful(self, *args) -> bool:
+        """
+        *args are required to support this method within transition configs
+              but not used
+        """
+        if self.is_command():
+            return not self.has_failure and self._event.get('detail').get('status') == 'Success'
 
-
-    def get_lifecycle_hook_name(self) -> str:
-        raise NotImplementedError()
-
-
-    def get_autoscaling_group_name(self) -> str:
-        raise NotImplementedError()
-
-
-    def get_instance_id(self) -> str:
-        raise NotImplementedError()
-
-
-    def get_metadata(self) -> dict:
-        raise NotImplementedError()
+        return not self.has_failure
 
 
     def set_has_failure(self):
         self.has_failure = True
-
-
-class AutoscalingEvent(Event):
-
-    def __init__(self, event: dict):
-        super().__init__(event)
-
-        metadata = self._event.get('detail').get('NotificationMetadata')
-        if type(metadata) is not dict:
-            self._event.get('detail').update({
-                'NotificationMetadata': json.loads(metadata)
-            })
-
-
-    def get_lifecycle_action_token(self) -> str:
-        return self._event.get('detail').get('LifecycleActionToken')
-
-
-    def get_lifecycle_transition(self) -> str:
-        return self._event.get('detail').get('LifecycleTransition')
-
-
-    def get_lifecycle_hook_name(self) -> str:
-        return self._event.get('detail').get('LifecycleHookName')
-
-
-    def get_autoscaling_group_name(self) -> str:
-        return self._event.get('detail').get('AutoScalingGroupName')
-
-
-    def get_instance_id(self) -> str:
-        return self._event.get('detail').get('EC2InstanceId')
-
-
-    def get_metadata(self) -> dict:
-        return self._event.get('detail').get('NotificationMetadata')
-
-
-class SsmEvent(Event):
-
-    def to_str(self):
-        action = 'launching' if self.is_launching() else 'terminating'
-        msg = '%s for "%s" while "%s" in group "%s" on instance "%s"' % (
-            self._event.get('detail-type'),
-            self._command.get('Comment'),
-            action,
-            self.get_autoscaling_group_name(),
-            self.node.get_id()
-        )
-        return msg
-
-
-    def get_command_id(self):
-        return self._event.get('detail').get('command-id')
-
-
-    def get_lifecycle_result(self) -> str:
-        if not self.has_failure and (self.is_terminating() or self.is_successful()):
-            return self._CONTINUE
-
-        return self._ABANDON
-
-
-    def get_event(self):
-        e = super().get_event()
-        e.update({ 'CommandMetadata': self.get_command_metadata() })
-        return e
-
-
-    def is_successful(self) -> bool:
-        return self._event.get('detail').get('status') == 'Success'
-
-
-    def get_command_metadata(self) -> dict:
-        return self._command
-
-
-    def get_lifecycle_action_token(self) -> str:
-        return self._command.get('detail').get('LifecycleActionToken', '')
-
-
-    def get_lifecycle_transition(self) -> str:
-        return self._command.get('detail').get('LifecycleTransition', '')
-
-
-    def get_lifecycle_hook_name(self) -> str:
-        return self._command.get('detail').get('LifecycleHookName', '')
-
-
-    def get_autoscaling_group_name(self) -> str:
-        return self._command.get('detail').get('AutoScalingGroupName')
-
-
-    def get_instance_id(self) -> str:
-        return self._command.get('detail').get('EC2InstanceId')
-
-
-    def get_metadata(self) -> dict:
-        return self._command.get('detail').get('NotificationMetadata', { })
-
-
-class ScheduledEvent(Event):
-    def get_name(self):
-        return self._event.get('resources')[0].split('/')[-1]
-
-
-    def get_lifecycle_action_token(self) -> str:
-        raise NotImplementedError("A scheduled event can not handle lifecycle.")
-
-
-    def get_lifecycle_transition(self) -> str:
-        return ""
-
-
-    def get_lifecycle_hook_name(self) -> str:
-        raise NotImplementedError("A scheduled event can not handle lifecycle.")
-
-
-    def get_autoscaling_group_name(self) -> str:
-        return self.get_name()
-
-
-    def get_instance_id(self) -> str:
-        if self.node is not None:
-            return self.node.get_id()
-
-        return 'n/a'
-
-
-    def get_metadata(self) -> dict:
-        return { }
-
-
-    def get_command_metadata(self):
-        data = super().get_command_metadata()
-        data.get('detail').update({
-            # @todo this property should be renamed to Name to reflect the event name
-            'AutoScalingGroupName': self.get_name(),
-            'EC2InstanceId': self.get_instance_id(),
-            'NotificationMetadata': self.get_metadata()
-        })
-        return data
 
 
 class Model(object):
@@ -334,15 +253,19 @@ class Model(object):
     :type _state: str
     :param event:
     :type event: Event
+    :param node:
+    :type node: Node
     """
     logger = None
     formatter = None
     clients = None
     repositories = None
 
-    _event = None
+    event = None
+    _node = None
     _state = None
-    seen_states = []
+    allow_state_updates = False
+    passed_states = []
 
     EVENT = 'event'
     NODE = 'node'
@@ -354,55 +277,8 @@ class Model(object):
         self.repositories = repositories
         self.clients = clients
         self.formatter = logging.get_formatter()
-
-
-    def load_event(self, message) -> Event:
-        self._event = Event.from_sns_message(message)
-        if self._event.has_command():
-            command_id = self._event.get_raw_event().get('detail').get('command-id')
-            command = self.get_command_repository().get(command_id)
-            if command == { }:
-                raise RuntimeError('Could not load command %s.' % command_id)
-            self.get_command_repository().delete(command_id)
-            self._event.set_command(command)
-
-        self._event.node = self.load_node()
-        if self._event.node.is_new():
-            self._wait_for_cloud_init()
-
-        # set the initial state
-        self._state = self._event.node.get_state()
-
-        # reset seen states
-        self.seen_states = []
-
-        self.report()
-
-        return self._event
-
-
-    def load_node(self):
-        return self.get_node_repository().get(self._event.get_instance_id())
-
-
-    def _wait_for_cloud_init(self):
-        self.logger.debug("Waiting for node to be registered and cloud init to finish ...")
-        node = self._event.node
-        self.clients.get('dynamodb').wait_for_scan_count_is(
-            1,
-            'Ident = :id and ItemStatus = :status',
-            {
-                ":id": node.get_id(),
-                ":status": 'finished_cloud_init'
-            }
-        )
-        # fetch the node again to pick up all data probably set by cloud init
-        self._event.node = self.repositories.get('node').get(node.get_id())
-
-
-    @property
-    def event(self) -> Event:
-        return self._event
+        self.node = None
+        self.state = None
 
 
     @property
@@ -413,71 +289,128 @@ class Model(object):
     @state.setter
     def state(self, value: str):
         # ignore state updates until an event has been loaded
+        # e.g. the initial state of the machine
         # @see self.load_event()
-        if self._state is None:
+        if self._state is None or not self.allow_state_updates:
             return
 
         self._state = value
-        self.repositories.get('node').update(self.event.node, {
-            'ItemStatus': self._state
-        })
-        self.seen_states.append(self._state)
+        self.passed_states.append(self._state)
+
+        if self.node is not None:
+            self.repositories.get('node').update(self.node, {
+                'ItemStatus': self._state
+            })
+
+
+    @property
+    def node(self) -> Node:
+        return self._node
+
+
+    @node.setter
+    def node(self, node: Node):
+        if node is not None:
+            self._node = node
+            if self.node.is_new():
+                self._wait_for_cloud_init()
+
+
+    def initialize(self, event: Event):
+        self.event = event
+        if self.event.is_command():
+            command = self.get_command_repository().pop(self.event.get_raw().get('detail').get('command-id'))
+            self.event.set_lifecycle_data(command.get('LifecycleData', dict()))
+            self.event.set_name(command.get('EventName', ''))
+
+        if self.event.is_lifecycle():
+            self.node = self.get_node_repository().get(self.event.get_lifecycle_data().get_instance_id())
+            self._state = self.node.get_state()
+        else:
+            if self.event.is_command():
+                instance_id = [resource.split('/')[-1] for resource in self.event.get_raw().get('resources')][0]
+                self.node = self.get_node_repository().get(instance_id)
+                self._state = self.node.get_state()
+            else:
+                self._state = self.event.get_name()
+
+        self.passed_states = []
+
+
+    def _wait_for_cloud_init(self):
+        if self.node.get_state() != 'finished_cloud_init':
+            self.logger.debug("Waiting for node to be registered and cloud init to finish ...")
+            self.clients.get('dynamodb').wait_for_scan_count_is(
+                1,
+                'Ident = :id and ItemStatus = :status',
+                {
+                    ":id": self.node.get_id(),
+                    ":status": 'finished_cloud_init'
+                }
+            )
+
+        # fetch the node again to pick up all data probably set by cloud init
+        # !! use self._node here to ensure this method is not called again
+        self._node = self.repositories.get('node').get(self.node.get_id())
 
 
     def get_transitions(self):
         raise NotImplementedError()
 
 
-    def report(self, force_report_autoscaling_activity: bool = False):
-        if self._event.has_command():
-            self.logger.debug('Reporting activity: %s', self._event.to_str())
+    def report(self, direction, event_data: EventData, force_report_autoscaling_activity: bool = False):
+        status = 'INFO' if self.event.is_successful() else "ERROR"
+        if self.logger.level == DEBUG or status == 'ERROR':
+            self.logger.debug('Reporting activity: %s', repr(event_data))
+            subject = '%s from %s to %s via %s' % (
+                direction,
+                event_data.transition.source,
+                event_data.transition.dest,
+                event_data.event.name
+            )
             self.clients.get('sns').publish_activity(
-                'SUCCESS' if self._event.is_successful() else "ERROR",
-                self._event.to_str(),
+                status,
+                subject,
+                self.event.to_str() + ' : ' + repr(event_data),
                 'eu-west-1'
             )
 
-        if force_report_autoscaling_activity or self._event.is_autoscaling():
+        if self.event.is_lifecycle() and (force_report_autoscaling_activity or self.event.is_autoscaling()):
             activity = self.clients.get('autoscaling').get_activity(
-                self._event.get_autoscaling_group_name(),
-                self._event.is_launching(),
-                self._event.node.get_id()
+                self.event.get_lifecycle_data().get_autoscaling_group_name(),
+                self.event.get_lifecycle_data().is_launching(),
+                self.node.get_id()
             )
             self.logger.debug('Reporting activity: %s', activity)
             self.clients.get('sns').publish_autoscaling_activity(activity, 'eu-west-1')
 
 
-    def _send_command(self, event_data: EventData, comment: str, commands: list, target_nodes = None, command_timeout = 60):
-        _event = self.get_event(event_data)
+    def _send_command(self, comment: str, commands: list, target_nodes = None, command_timeout = 60):
         if target_nodes is not None:
             target_nodes = listify(target_nodes)
         else:
-            target_nodes = [_event.node]
+            target_nodes = [self.node]
 
         target_node_ids = []
         for node in target_nodes:
             target_node_ids.append(node.get_id())
 
-        metadata = _event.get_command_metadata()
-        metadata.update({ 'RunningOn': ', '.join(target_node_ids) })
-        metadata.update({ 'Comment': comment })
-        metadata.update({ 'Commands': ', '.join(commands) })
+        metadata = {
+            'RunningOn': ', '.join(target_node_ids),
+            'Comment': comment,
+            'Commands': ', '.join(commands),
+            'EventName': self.event.get_name()
+        }
+
+        if self.event.is_lifecycle():
+            metadata.update({'LifecycleData': self.event.get_lifecycle_data().to_dict()})
 
         command_id = self.clients.get('ssm').send_command(target_node_ids, comment, commands, command_timeout)
         self.repositories.get('command').register(command_id, metadata)
 
-
     #
     # convenience methods
     #
-
-    def get_event(self, event_data: EventData) -> Event:
-        return event_data.kwargs.get(self.EVENT)
-
-
-    def get_node(self, event_data: EventData) -> Node:
-        return self.get_event(event_data).node
-
 
     def get_node_repository(self) -> NodeRepository:
         return self.repositories.get(self.NODE)
@@ -486,42 +419,33 @@ class Model(object):
     def get_command_repository(self) -> CommandRepository:
         return self.repositories.get(self.COMMAND)
 
-
     #
     # built-in trigger functions
     #
 
     def do_complete_lifecycle_action(self, event_data: EventData):
-        _event = self.get_event(event_data)
-        _node = _event.node
-        _token = _event.get_lifecycle_action_token()
-        if _node.has_property('LifecycleActionToken'):
-            _token = _node.get_property('LifecycleActionToken')
-            self.get_node_repository().unset_property(_node, ['LifecycleActionToken'])
-
-        self.logger.info('completing autoscaling action for node %s', _node.to_dict())
+        self.logger.info('completing autoscaling action for node %s', self.node.to_dict())
         self.clients.get('autoscaling').complete_lifecycle_action(
-            _event.get_lifecycle_hook_name(),
-            _event.get_autoscaling_group_name(),
-            _token,
-            _event.get_lifecycle_result(),
-            _node.get_id()
+            self.event.get_lifecycle_data().get_lifecycle_hook_name(),
+            self.event.get_lifecycle_data().get_autoscaling_group_name(),
+            self.event.get_lifecycle_data().get_lifecycle_action_token(),
+            self.event.get_lifecycle_result(),
+            self.node.get_id()
         )
 
-        if _event.is_launching():
+        if self.event.get_lifecycle_data().is_launching():
             self.clients.get('autoscaling').wait_for_activity_to_complete(
-                _event.get_autoscaling_group_name(),
-                _event.is_launching(),
-                _node.get_id()
+                self.event.get_lifecycle_data().get_autoscaling_group_name(),
+                self.event.get_lifecycle_data().is_launching(),
+                self.node.get_id()
             )
 
-        self.report(True)
+        self.report('Finished', event_data, True)
 
 
-    def do_remove_from_db(self, event_data: EventData):
-        _node = self.get_event(event_data).node
-        self.logger.info('removing node %s from db', _node.to_dict())
-        self.repositories.get('node').delete(_node)
+    def do_remove_from_db(self, *args):
+        self.logger.info('removing node %s from db', self.node.to_dict())
+        self.repositories.get('node').delete(self.node)
 
 
 class ConfigurationError(RuntimeError):
@@ -548,11 +472,13 @@ class StopProcessingAfterStateChange(Exception):
 class LifecycleHandler(object):
     """
     :type machine: Machine
+    :type model: Model
     :type __in_failure_handling: bool
     :type __raise_on_operation_failure: bool
     """
     machine_cls = Machine
     machine = None
+    model = None
     __in_failure_handling = False
     __raise_on_operation_failure = True
     __default_trigger = {
@@ -575,16 +501,23 @@ class LifecycleHandler(object):
         'trigger'
     ]
 
-
     #
     # initialization
     #
 
     def __init__(self, model: Model):
-        self.machine = self.machine_cls(model, auto_transitions = False, send_event = True, queued = False)
+        self.model = model
+        self.machine = self.machine_cls(self.model, auto_transitions = False, send_event = True, queued = False)
+        self.__add_transitions()
+        # set the initial state after initializing transitions
+        # to avoid duplicate destination state errors
+        self.machine.initial = self.model.state
+        self.model.allow_state_updates = True
 
+
+    def __add_transitions(self):
         self.__get_logger().debug('initializing transitions')
-        for config in self.machine.model.get_transitions():
+        for config in self.model.get_transitions():
             transition = self.__default_transition.copy()
             transition.update(config)
 
@@ -673,7 +606,7 @@ class LifecycleHandler(object):
         stop_after_trigger = trigger.get('stop_after_trigger')
         trigger.pop('stop_after_trigger')
         if stop_after_trigger:
-            after += [self.__continue_with_next_state]
+            after += [self.__stop_after_trigger]
 
         if trigger != { }:
             raise TriggerParameterConfigurationError(
@@ -690,47 +623,42 @@ class LifecycleHandler(object):
             after = after
         )
 
-
     #
     # processing
     #
+    def __call__(self):
+        # fail early, if lifecycle conditions do not pass
+        if self.model.event.is_lifecycle():
+            if self.model.event.get_lifecycle_data().is_launching() and self.model.event.is_autoscaling() and not self.model.node.is_new():
+                raise self.__get_formatter().get_error(RuntimeError, "Only new nodes can be launched.")
 
-    def __call__(self, message: dict):
-        event = self.__get_model().load_event(message)
-
-        if event.is_launching() and event.is_autoscaling() and not event.node.is_new():
-            raise self.__get_formatter().get_error(RuntimeError, "Only new nodes can be launched.")
-
-        if event.is_terminating() and event.node.is_new():
-            raise self.__get_formatter().get_error(RuntimeError, "New nodes cannot terminate.")
-
-        msg = 'processing event %s with data: (event)%s, (node)%s'
-        self.__get_logger().info(msg, repr(event), event.get_event(), event.node.to_dict())
+            if self.model.event.get_lifecycle_data().is_terminating() and self.model.node.is_new():
+                raise self.__get_formatter().get_error(RuntimeError, "New nodes cannot terminate.")
 
         # fail early, if no triggers can be found for the current state
-        triggers = self.machine.get_triggers(self.__get_model().state)
+        triggers = self.machine.get_triggers(self.model.state)
         if len(triggers) < 1:
-            raise RuntimeError('no trigger could be found for %s' % self.__get_model().state)
+            raise RuntimeError('no trigger could be found for %s' % self.model.state)
 
-        self.__process(triggers, event)
+        self.__get_logger().info('processing model %s', repr(self.model))
 
-        self.__get_logger().info('processing event %s complete', repr(event))
+        self.__process(triggers)
+
+        self.__get_logger().info('processed model %s', repr(self.model))
 
 
-    def __process(self, triggers: list, event: Event):
+    def __process(self, triggers: list):
         try:
             while len(triggers) > 0:
-                state = self.__get_model().state
+                state = self.model.state
                 self.__get_logger().debug('possible triggers for state %s: %s', state, triggers)
                 for trigger in triggers:
                     # reset trigger condition
                     self.__raise_on_operation_failure = True
 
                     try:
-                        self.__get_logger().info('pulling trigger %s on node %s', trigger, event.node.to_dict())
-                        # the ide shows an argument error event should be of type dict, which is
-                        # not correct due to incorrect doc comments. **kwargs is always of type tuple not dict
-                        self.machine.dispatch(trigger, event = event)
+                        self.__get_logger().info('pulling trigger %s', trigger)
+                        self.machine.dispatch(trigger)
 
                     except StopProcessingAfterStateChange as e:
                         self.__get_logger().info(e.get_message())
@@ -738,12 +666,13 @@ class LifecycleHandler(object):
 
                     except StopIterationAfterTrigger as e:
                         self.__get_logger().info(e.get_message())
-                        break
+                        return
 
                     except Exception as e:
+                        transitions = self.machine.events.get(trigger).transitions.get(self.model.state)
                         self.__get_clients().get('sns').publish_error(
                             e,
-                            'launching' if event.is_launching() else 'terminating',
+                            transitions[0] if transitions is not None else trigger,
                             'eu-west-1'
                         )
                         if self.__raise_on_operation_failure:
@@ -755,33 +684,32 @@ class LifecycleHandler(object):
                         # to be able to proceed with next triggers
                         # a destination state of None indicates an internal transition and the model
                         # will not be updated and thus the iteration is stopped
-                        transitions = self.machine.events.get(trigger).transitions.get(self.__get_model().state)
                         if transitions is not None and transitions[0].dest is not None:
                             msg = 'Trigger pulled before state change or error in conditions. Forcing state to %s'
                             self.__get_logger().info(msg, transitions[0].dest)
-                            self.__get_model().state = transitions[0].dest
+                            self.model.state = transitions[0].dest
 
                     self.__get_logger().info('trigger %s complete', trigger)
 
-                    if self.__get_model().state != state:
+                    if self.model.state != state:
                         # the state change has been applied
                         # proceed with triggers for the updated state
                         break
 
-                if self.__get_model().state == state:
+                if self.model.state == state:
                     # state has not changed after pulling all triggers
                     # stop processing
                     break
 
                 # load new triggers from updated state
-                triggers = self.machine.get_triggers(self.__get_model().state)
+                triggers = self.machine.get_triggers(self.model.state)
 
         except Exception as e:
             if self.__in_failure_handling:
                 self.__get_logger().exception("An error occured during failure handling.", repr(e))
                 self.__get_clients().get('sns').publish_error(
                     e,
-                    'failure handling while ' + 'launching' if event.is_launching() else 'terminating',
+                    'fail',
                     'eu-west-1'
                 )
                 raise
@@ -789,15 +717,14 @@ class LifecycleHandler(object):
             msg = "An error occurred during transition. %s. Entering failure handling."
             self.__get_logger().exception(msg, repr(e))
             self.__in_failure_handling = True
-            event.set_has_failure()
 
-            self.machine.model.state = 'failure'
-            triggers = self.machine.get_triggers(self.__get_model().state)
+            self.model.event.set_has_failure()
+            self.model.state = 'failure'
+            triggers = self.machine.get_triggers(self.model.state)
             if len(triggers) < 1:
                 self.__get_logger().warning("No triggers for state failure found.")
             else:
-                self.__process(triggers, event)
-
+                self.__process(triggers)
 
     #
     # private built-in trigger functions
@@ -805,27 +732,30 @@ class LifecycleHandler(object):
 
     def __log_transition(self, direction: str, event_data: EventData):
         self.__get_logger().info(
-            '%s node %s from %s to %s via %s',
+            '%s from %s to %s via %s%s',
             direction,
-            self.__get_node(event_data).get_id(),
             event_data.transition.source,
             event_data.transition.dest,
-            event_data.event.name
+            event_data.event.name,
+            ' on node %s' % (self.model.node.get_id() if self.model.node is not None else " ")
         )
         self.__log_autoscaling_activity(event_data)
 
 
     def __log_before(self, event_data: EventData):
         self.__log_transition('Transitioning', event_data)
+        self.model.report('Transitioning', event_data)
 
 
     def __log_after(self, event_data: EventData):
         self.__log_transition('Transitioned', event_data)
+        self.model.report('Transitioned', event_data)
 
 
     def __is_event_successful(self, event_data: EventData) -> bool:
-        status = self.__get_event(event_data).is_successful()
-        if self.__get_event(event_data).has_command():
+        self.__get_logger().debug("Check event status: %s", repr(event_data))
+        status = self.model.event.is_successful()
+        if self.model.event.is_command():
             if status:
                 self.__get_logger().debug("Command was successful.")
             else:
@@ -835,7 +765,7 @@ class LifecycleHandler(object):
         return status
 
 
-    def __continue_with_next_state(self, event_data: EventData):
+    def __stop_after_trigger(self, event_data: EventData):
         raise StopIterationAfterTrigger("Trigger forces to continue with next trigger. %s" % repr(event_data))
 
 
@@ -849,51 +779,47 @@ class LifecycleHandler(object):
 
 
     def __log_autoscaling_activity(self, event_data: EventData):
-        _event = self.__get_event(event_data)
-        try:
-            activity = self.machine.model.clients.get('autoscaling').get_activity(
-                _event.get_autoscaling_group_name(), _event.is_launching(), _event.get_instance_id()
+        if self.model.event.is_lifecycle():
+            _lifecycle_data = self.model.event.get_lifecycle_data()
+            activity = self.model.clients.get('autoscaling').get_activity(
+                _lifecycle_data.get_autoscaling_group_name(),
+                _lifecycle_data.is_launching(),
+                _lifecycle_data.get_instance_id()
             )
             self.__get_logger().info('%s %s autoscaling activity on event %s: %s', activity.get('StatusCode').upper(),
-                                     'launching' if _event.is_launching else 'terminating',
+                                     'launching' if _lifecycle_data.is_launching else 'terminating',
                                      repr(event_data), activity)
-        except Exception:
-            self.__get_logger().warning('Could not find autoscaling activity for node %s', _event.get_instance_id())
-            return
 
-
+            if activity == dict():
+                self.__get_logger().warning('Could not find autoscaling activity for node %s', _lifecycle_data.get_instance_id())
 
     #
     # convenience methods
     #
 
-    def __get_model(self) -> Model:
-        return self.machine.model
-
-
     def __get_logger(self) -> Logger:
-        return self.__get_model().logger
+        return self.model.logger
 
 
     def __get_formatter(self) -> MessageFormatter:
-        return self.__get_model().formatter
+        return self.model.formatter
 
 
     def __get_node_repository(self) -> NodeRepository:
-        return self.__get_model().get_node_repository()
+        return self.model.get_node_repository()
 
 
     def __get_command_repository(self) -> CommandRepository:
-        return self.__get_model().get_command_repository()
+        return self.model.get_command_repository()
 
 
     def __get_clients(self) -> Clients:
-        return self.__get_model().clients
+        return self.model.clients
 
 
-    def __get_event(self, event_data: EventData) -> Event:
-        return self.__get_model().get_event(event_data)
+    def __get_event(self) -> Event:
+        return self.model.event
 
 
-    def __get_node(self, event_data: EventData) -> Node:
-        return self.__get_model().get_node(event_data)
+    def __get_node(self) -> Node:
+        return self.model.node

@@ -5,7 +5,7 @@
   "ItemType": "command",
   "RunningOn": "i-007de616626a946ce",
   "account": "390028087082",
-  "detail": {
+  "LifecycleData": {
     "AutoScalingGroupName": "docker-swarm-worker-live",
     "EC2InstanceId": "i-007de616626a946ce",
     "LifecycleActionToken": "b502e984-0367-4aed-ab0b-963a602ed94c",
