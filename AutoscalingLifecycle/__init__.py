@@ -11,15 +11,15 @@ from .entity import Node
 from .entity import NodeRepository
 from .entity import Repositories
 from .entity import Repository
+from .exceptions import CommandNotFoundError
+from .exceptions import ConfigurationError
+from .exceptions import EventNotSupportedError
+from .exceptions import StopIterationAfterTrigger
+from .exceptions import StopProcessingAfterStateChange
+from .exceptions import TriggerParameterConfigurationError
 from .logging import Formatter
 from .logging import Logging
 from .logging import MessageFormatter
-from .exceptions import ConfigurationError
-from .exceptions import TriggerParameterConfigurationError
-from .exceptions import StopIterationAfterTrigger
-from .exceptions import StopProcessingAfterStateChange
-from .exceptions import CommandNotFoundError
-from .exceptions import EventNotSupportedError
 
 
 def listify(obj):
@@ -261,6 +261,10 @@ class Model(object):
     :type clients: Clients
     :param repositories:
     :type repositories: Repositories
+    :param environment:
+    :type environment: str
+    :param account:
+    :type account: str
     :param _state:
     :type _state: str
     :param event:
@@ -272,6 +276,8 @@ class Model(object):
     formatter = None
     clients = None
     repositories = None
+    environment = None
+    account = None
 
     event = None
     _node = None
@@ -284,11 +290,13 @@ class Model(object):
     COMMAND = 'command'
 
 
-    def __init__(self, clients: Clients, repositories: Repositories, logging: Logging):
+    def __init__(self, clients: Clients, repositories: Repositories, logging: Logging, environment: str, account: str):
         self.logger = logging.get_logger()
         self.repositories = repositories
         self.clients = clients
         self.formatter = logging.get_formatter()
+        self.environment = environment
+        self.account = account
         self.node = None
         self.state = None
 
@@ -424,6 +432,7 @@ class Model(object):
         command_id = self.clients.get('ssm').send_command(target_node_ids, comment, commands, command_timeout)
         self.repositories.get('command').register(command_id, metadata)
 
+
     #
     # convenience methods
     #
@@ -434,6 +443,7 @@ class Model(object):
 
     def get_command_repository(self) -> CommandRepository:
         return self.repositories.get(self.COMMAND)
+
 
     #
     # built-in trigger functions
@@ -618,6 +628,7 @@ class LifecycleHandler(object):
             before = before,
             after = after
         )
+
 
     #
     # processing
