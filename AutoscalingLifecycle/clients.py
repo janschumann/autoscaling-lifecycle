@@ -2,7 +2,7 @@ from logging import Logger
 
 import botocore.waiter as waiter
 from boltons.tbutils import ExceptionInfo
-from boto3 import Session
+import boto3
 from botocore.client import BaseClient as BotoClient
 from botocore.exceptions import WaiterError, ClientError
 
@@ -17,11 +17,11 @@ class ClientFactory(object):
     """
 
 
-    def __init__(self, session: Session, logger: Logger):
+    def __init__(self, session: boto3.Session, logger: Logger):
         """
 
-        :param session: A boto3 Session instamce
-        :type session: Session
+        :param session: A boto3 boto3.Session instamce
+        :type session: boto3.Session
         :param logger: A LifecycleLogger instance
         :type logger: LifecycleLogger
         """
@@ -340,6 +340,12 @@ class BaseClient(object):
 
 
 class Ec2Client(BaseClient):
+
+    def __init__(self, client: BotoClient, waiters: CustomWaiters, logging: Logging, *args):
+        super().__init__(client, waiters, logging)
+        self.resource = boto3.resource('ec2')
+
+
     def find_instances_by_name(self, name) -> list:
         response = self.client.describe_instances(
             Filters=[
@@ -386,7 +392,7 @@ class Ec2Client(BaseClient):
         return dict()
 
 
-    def create_snapshot(self, description, volume_id):
+    def create_snapshot(self, description, volume_id, tags: list):
         response = self.client.create_snapshot(
             Description=description,
             VolumeId=volume_id,
@@ -395,6 +401,10 @@ class Ec2Client(BaseClient):
         self.client.get_waiter('snapshot_completed').wait(
             SnapshotIds=[response.get('SnapshotId')],
         )
+
+        if len(tags) > 0:
+            snapshot = self.resource.Snapshot(response.get('SnapshotId'))
+            snapshot.create_tags(Tags=tags)
 
 
 class AutoscalingClient(BaseClient):
