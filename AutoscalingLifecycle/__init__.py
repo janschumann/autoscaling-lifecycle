@@ -1,6 +1,6 @@
 import json
-from logging import Logger
 from logging import DEBUG
+from logging import Logger
 
 from transitions import EventData
 from transitions import Machine
@@ -14,6 +14,12 @@ from .entity import Repository
 from .logging import Formatter
 from .logging import Logging
 from .logging import MessageFormatter
+from .exceptions import ConfigurationError
+from .exceptions import TriggerParameterConfigurationError
+from .exceptions import StopIterationAfterTrigger
+from .exceptions import StopProcessingAfterStateChange
+from .exceptions import CommandNotFoundError
+from .exceptions import EventNotSupportedError
 
 
 def listify(obj):
@@ -23,9 +29,9 @@ def listify(obj):
 
 
 class LifecycleData(object):
-
     LAUNCHING = 'autoscaling:EC2_INSTANCE_LAUNCHING'
     TERMINATING = 'autoscaling:EC2_INSTANCE_TERMINATING'
+
 
     def __init__(self, data: dict):
         self.data = data
@@ -121,11 +127,13 @@ class Event(object):
 
         self.name = self._event.get('detail-type')
         if self.is_command():
+            # unmarshal parameters
+            self.get_detail().update({ 'parameters': json.loads(self.get_detail().get('parameters')) })
             if self.is_lifecycle():
                 self.name = '%s for %s' % (self.name, self._lifecycle_data.get_lifecycle_transition())
 
         elif self.is_scheduled():
-            self.name = self._event.get('resources')[0].split('/')[-1]
+            self.name = self.get_resources()[0]
 
 
     def get_name(self):
@@ -217,11 +225,15 @@ class Event(object):
         if self.is_command():
             msg = '%s finished commands %s on %s' % (
                 msg,
-                ','.join(json.loads(self.get_detail().get('parameters')).get('commands')),
-                ','.join([resource.split('/')[-1] for resource in self._event.get('resources')])
+                ','.join(self.get_detail().get('parameters').get('commands')),
+                ','.join(self.get_resources())
             )
 
         return msg
+
+
+    def get_resources(self) -> list:
+        return [resource.split('/')[-1] for resource in self._event.get('resources')]
 
 
     def is_successful(self, *args) -> bool:
@@ -319,7 +331,11 @@ class Model(object):
     def initialize(self, event: Event):
         self.event = event
         if self.event.is_command():
-            command = self.get_command_repository().pop(self.event.get_raw().get('detail').get('command-id'))
+            try:
+                command = self.get_command_repository().pop(self.event.get_raw().get('detail').get('command-id'))
+            except CommandNotFoundError:
+                raise EventNotSupportedError('This event does not support this event.')
+
             self.event.set_lifecycle_data(command.get('LifecycleData', dict()))
             self.event.set_name(command.get('EventName', ''))
 
@@ -403,7 +419,7 @@ class Model(object):
         }
 
         if self.event.is_lifecycle():
-            metadata.update({'LifecycleData': self.event.get_lifecycle_data().to_dict()})
+            metadata.update({ 'LifecycleData': self.event.get_lifecycle_data().to_dict() })
 
         command_id = self.clients.get('ssm').send_command(target_node_ids, comment, commands, command_timeout)
         self.repositories.get('command').register(command_id, metadata)
@@ -448,27 +464,6 @@ class Model(object):
         self.repositories.get('node').delete(self.node)
 
 
-class ConfigurationError(RuntimeError):
-    def get_message(self):
-        return self.args[0]
-
-
-class TriggerParameterConfigurationError(ConfigurationError):
-    pass
-
-
-class StopIterationAfterTrigger(Exception):
-    """ Signal the end trigger from LifecycleHandler.__process(). """
-    def get_message(self):
-        return self.args[0]
-
-
-class StopProcessingAfterStateChange(Exception):
-    """ Signal the end from LifecycleHandler.__process(). """
-    def get_message(self):
-        return self.args[0]
-
-
 class LifecycleHandler(object):
     """
     :type machine: Machine
@@ -500,6 +495,7 @@ class LifecycleHandler(object):
     __illegal_trigger_names = [
         'trigger'
     ]
+
 
     #
     # initialization
@@ -726,6 +722,7 @@ class LifecycleHandler(object):
             else:
                 self.__process(triggers)
 
+
     #
     # private built-in trigger functions
     #
@@ -791,7 +788,9 @@ class LifecycleHandler(object):
                                      repr(event_data), activity)
 
             if activity == dict():
-                self.__get_logger().warning('Could not find autoscaling activity for node %s', _lifecycle_data.get_instance_id())
+                self.__get_logger().warning('Could not find autoscaling activity for node %s',
+                                            _lifecycle_data.get_instance_id())
+
 
     #
     # convenience methods

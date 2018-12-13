@@ -7,7 +7,7 @@ requires = ['boltons>=18.0.1,<19.0.0', 'transitions>=0.6.9']
 
 setuptools.setup(
     name = "AutoscalingLifecycle",
-    version = "0.60.0",
+    version = "0.61.0",
     author = "Jan Schumann",
     author_email = "js@schumann-it.com",
     description = "A library to handle aws autoscaling lifecycle events",

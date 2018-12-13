@@ -1,6 +1,7 @@
 from logging import Logger
 
 from .clients import DynamoDbClient
+from .exceptions import CommandNotFoundError
 
 
 class Repository(object):
@@ -42,7 +43,7 @@ class CommandRepository(Repository):
     def pop(self, id: str):
         command = self.get(id)
         if command == { }:
-            raise RuntimeError('Could not load command %s.' % id)
+            raise CommandNotFoundError('Could not load command %s.' % id)
         self.delete(id)
 
         return command
