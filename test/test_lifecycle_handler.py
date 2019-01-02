@@ -82,7 +82,7 @@ class TestLifecycleHandler(unittest.TestCase):
         repositories.add('node', NodeRepository)
         repositories.add('command', CommandRepository)
 
-        self.model = MockModel(mock.Mock(), repositories, logging)
+        self.model = MockModel(mock.Mock(), repositories, logging, 'test', 'test')
 
 
     def get_default_tansition_config(self):
@@ -1151,7 +1151,7 @@ class TestLifecycleHandler(unittest.TestCase):
         clients = mock.Mock()
         clients.get.return_value = client
         client.wait_for_scan_count_is = mock.MagicMock()
-        model = Model(clients, repositories, mock.Mock())
+        model = Model(clients, repositories, mock.Mock(), 'test', 'test')
 
         event = get_event('autoscaling_event.json')
         model.initialize(event)
@@ -1160,7 +1160,7 @@ class TestLifecycleHandler(unittest.TestCase):
 
 
     def test_scheduled_event_does_not_load_a_node_by_default(self):
-        model = MockModel(mock.Mock(), mock.Mock(), mock.Mock())
+        model = MockModel(mock.Mock(), mock.Mock(), mock.Mock(), 'test', 'test')
         event = get_event('scheduled_event.json')
         model.initialize(event)
         model.transitions = self.get_before_node_load_tansition_config()
@@ -1173,7 +1173,7 @@ class TestLifecycleHandler(unittest.TestCase):
 
 
     def test_scheduled_event_can_load_node_during_transitions(self):
-        model = MockModel(mock.Mock(), mock.Mock(), mock.Mock())
+        model = MockModel(mock.Mock(), mock.Mock(), mock.Mock(), 'test', 'test')
         event = get_event('scheduled_event.json')
         model.initialize(event)
         model.transitions = self.get_backup_tansition_config()

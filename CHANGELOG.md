@@ -7,6 +7,7 @@ NEW FEATURES:
 IMPROVEMENTS:
 
 * Add account and environment as model properties
+* fix tests
 
 ## 0.61.0
 
