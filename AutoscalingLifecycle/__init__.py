@@ -794,13 +794,14 @@ class LifecycleHandler(object):
                 _lifecycle_data.is_launching(),
                 _lifecycle_data.get_instance_id()
             )
-            self.__get_logger().info('%s %s autoscaling activity on event %s: %s', activity.get('StatusCode').upper(),
-                                     'launching' if _lifecycle_data.is_launching else 'terminating',
-                                     repr(event_data), activity)
 
             if activity == dict():
                 self.__get_logger().warning('Could not find autoscaling activity for node %s',
                                             _lifecycle_data.get_instance_id())
+            else:
+                self.__get_logger().info('%s %s autoscaling activity on event %s: %s', activity.get('StatusCode').upper(),
+                                         'launching' if _lifecycle_data.is_launching else 'terminating',
+                                         repr(event_data), activity)
 
 
     #
