@@ -120,10 +120,13 @@ class Event(object):
     has_failure = False
 
 
-    def __init__(self, event: dict):
+    def __init__(self, event: dict, metadata=None):
         self._event = event
         if self.is_autoscaling():
-            self.set_lifecycle_data(self.get_detail())
+            if metadata is None:
+                metadata = dict()
+            metadata.update(self.get_detail())
+            self.set_lifecycle_data(metadata)
 
         self.name = self._event.get('detail-type')
         if self.is_command():
