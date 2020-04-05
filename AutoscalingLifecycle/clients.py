@@ -17,20 +17,23 @@ class ClientFactory(object):
     """
 
 
-    def __init__(self, session: boto3.Session, logger: Logger):
+    def __init__(self, session: boto3.Session, default_region: str, logger: Logger):
         """
 
         :param session: A boto3 boto3.Session instamce
         :type session: boto3.Session
+        :param default_region: The default region to create clients in
+        :type default_region: str
         :param logger: A LifecycleLogger instance
         :type logger: LifecycleLogger
         """
         self.session = session
         self.logger = logger
+        self.default_region = default_region
         self.clients = {}
 
 
-    def get(self, name: str, region_name: str = 'eu-central-1'):
+    def get(self, name: str, region_name: str = ''):
         """
         Get a boto client. Clients will be cached locally.
         E.g. get_client('ssm') will return boto3.client('ssm')
@@ -44,6 +47,9 @@ class ClientFactory(object):
         :rtype: BaseClient
         :return: Service client instance
         """
+
+        if region_name == '':
+            region_name = self.default_region
 
         self.logger.debug('Retrieving client %s in region %s', name, region_name)
         key = name + '_' + region_name
@@ -302,14 +308,16 @@ class Clients(object):
         })
 
 
-    def get(self, name):
+    def get(self, name, region = ''):
         spec = self.__client_specs.get(name, None)
         if spec is None:
             raise RuntimeError("no specs for %s found" % name)
 
-        client = self.__clients.get('name', None)
+        cname = '{}-{}'.format(name, region)
+        client = self.__clients.get(cname, None)
         if client is None:
-            client = spec.get('class')(self.client_factory.get(name), self.waiters, self.logging, *spec.get('args'))
+            client = spec.get('class')(self.client_factory.get(name, region), self.waiters, self.logging, *spec.get('args'))
+            self.__clients.update({cname: client})
 
         return client
 
@@ -844,3 +852,15 @@ class SsmClient(BaseClient):
         self.logger.debug('Command "%s" on instance %s is running: %s', comment, instance_ids, command_id)
 
         return command_id
+
+
+class SecretsmanagerClient(BaseClient):
+
+    def get_current_secret_string(self, secret_id):
+        self.logger.debug('Secretsmanager: Fetch secret: %s', secret_id)
+        secret = self.client.get_secret_value(SecretId=secret_id)
+        secret_string = secret.get("SecretString", "")
+        if secret_string == "":
+            self.logger.warning('Secretsmanager: Could not fetch secret: %s', secret_id)
+
+        return secret_string
